@@ -1,8 +1,8 @@
 #include <sys/timerfd.h>
 #include <cstring>
 #include <unistd.h>
-#include "../src/EventLoop.h"
-#include "../src/channel.h"
+#include "EventLoop.h"
+#include "channel.h"
 
 
 miniduo::EventLoop *gLoop;

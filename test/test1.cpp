@@ -1,7 +1,8 @@
-#include "../src/EventLoop.h"
-#include "../src/util.h"
+#include "EventLoop.h"
+#include "util.h"
 #include <stdio.h>
 #include <thread>
+#include <unistd.h> // getpid()
 
 void threadFunc(){
     printf("threadFunc(): pid = %d, tid = %d\n",

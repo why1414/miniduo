@@ -1,4 +1,4 @@
-#include "../src/EventLoop.h"
+#include "EventLoop.h"
 #include <thread>
 
 miniduo::EventLoop* g_loop;
