@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #define trace(...)
 #define debug(...)
@@ -8,4 +9,4 @@
 #define fatal(...)
 #define fatalif(b, ...)
 
-#define log std::cout
+// #define log std::cout

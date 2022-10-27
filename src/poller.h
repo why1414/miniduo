@@ -34,7 +34,7 @@ public:
     Poller(EventLoop* loop);
     ~Poller();
 
-    // Polls the I/O events, called in the loop thread.
+    // Polls the I/O events, called in the loop thread, return current Timepoint.
     time_t poll(int timeoutMs, ChannelList* activeChannels);
 
     // Changes the interested I/O events, called in the loop thread.

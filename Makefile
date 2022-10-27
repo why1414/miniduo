@@ -47,6 +47,8 @@ clean_all :
 clean_tests :
 	rm -rf workspace/* objs/test/*
 
-.PHONY : clean $(TEST_BINS) run-% debug test all
+.PHONY : $(TEST_BINS) run-% debug test all clean
+# .PRECIOUS : $(SRC_OBJS) $(TEST_OBJS) # 临时解决 %.o 文件自动删除的问题
+.SECONDARY:
 
 

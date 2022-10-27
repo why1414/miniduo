@@ -1,5 +1,6 @@
 #include "EventLoop.h"
 #include "log.h"
+#include "logging.h"
 #include "channel.h"
 #include "poller.h"
 
@@ -20,10 +21,11 @@ EventLoop::EventLoop()
 {
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
-    log<<"EventLoop created\n";
+
+    log_trace("EventLoop created %p in thread %d", this, threadId_);
     if (t_loopInThisThread){
         // log fatal another EventLoop exists in this thread
-        log<<"another EventLoop exists in this thread\n";
+        log_fatal("Another EventLoop %p exists in this thread %d", t_loopInThisThread, threadId_);
     }
     else {
         t_loopInThisThread = this;
@@ -60,13 +62,14 @@ void EventLoop::loop(){
     // ::poll(nullptr, 0, 5*1000);
 
     // log trace Eventloop stop looping
-    log << "EventLoop " << this << " stop looping\n";
+    log_trace("EventLoop %p stop looping", this);
     looping_ = false;
 }
 
 void EventLoop::abortNotInLoopThread(){
     // log
-    log<<" Abort\n";
+    // log<<" Abort\n";
+    log_fatal("Abort! not in Loop Thread");
     pthread_exit(nullptr);
 }
 

@@ -53,6 +53,8 @@
         "set": "cpp",
         "numeric": "cpp",
         "random": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp"
     }
 }

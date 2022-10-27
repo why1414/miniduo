@@ -1,5 +1,6 @@
 #include "poller.h"
 #include "log.h"
+#include "logging.h"
 #include "channel.h"
 
 #include <poll.h>
@@ -26,14 +27,17 @@ time_t Poller::poll(int timeoutMs, ChannelList* activeChannels) {
     int numEvents = ::poll(pollfds_.data(), pollfds_.size(), timeoutMs);
     time_t now = time(0); // get current time;
     if(numEvents > 0) {
-        log << numEvents << " events happended";
+        // log << numEvents << " events happended";
+        log_trace("%d events happened", numEvents);
         fillActiveChannels(numEvents, activeChannels);
     }
     else if(numEvents == 0) {
-        log << " nothing happended";
+        // log << " nothing happended";
+        log_trace("nothing happened");
     }
     else {
-        log << "Poller::poll()";
+        // log << "Poller::poll()";
+        log_error("Poller::poll() return error");
     }
     return now;
 }
@@ -68,7 +72,8 @@ void Poller::fillActiveChannels(int numEvents,
 // 添加 Channel 的复杂度 O(logN), 更新已有Channel是 O(1)
 void Poller::updateChannel(Channel* channel) {
     assertInLoopThread();
-    log << "fd = " << channel->fd() << " events = " << channel->events();
+    // log << "fd = " << channel->fd() << " events = " << channel->events();
+    log_trace("fd = %d, events = %d", channel->fd(), channel->events());
     if(channel->index() < 0) {
         // a new channel, add to pollfds_
         assert(channels_.find(channel->fd()) == channels_.end());
