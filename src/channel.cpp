@@ -1,6 +1,7 @@
 #include "channel.h"
 #include "EventLoop.h"
-#include "log.h"
+// #include "log.h"
+#include "logging.h"
 
 #include <poll.h>
 
@@ -29,7 +30,8 @@ void Channel::update(){
 // Channel::handleEvent() 根据revents_的值分别调用不同的用户回调
 void Channel::handleEvent(){
     if(revents_ & POLLNVAL) {
-        log << "Channel::handleEvent() POLLNVAL";
+        // log << "Channel::handleEvent() POLLNVAL";
+        log_trace("Channel::handleEvent() POLLNVAL");
     }
 
     if(revents_ & (POLLERR | POLLNVAL)) {

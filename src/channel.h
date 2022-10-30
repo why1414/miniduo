@@ -29,7 +29,7 @@ public:
     int events() const { return events_; }
     void setRevents(int revt) { revents_ = revt; }
     bool isNoneEvent() const { return events_ == kNoneEvent; }
-
+    // 将 readable event 添加到感兴趣事件中，并在poller更新
     void enableReading() { events_ |= kReadEvent; update(); }
     // void enableWriting() { events_ |= kWriteEvent; update(); }
     // void disableWriting() { events_ &= ~kWriteEvent; update(); }

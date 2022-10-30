@@ -4,6 +4,7 @@
 #include "channel.h"
 #include "poller.h"
 
+
 #include <cassert>
 #include <poll.h> 
 #include <iostream>
@@ -11,13 +12,15 @@
 using namespace miniduo;
 __thread EventLoop* t_loopInThisThread = 0;
 
+extern Timestamp getTimeOfNow();
 const int kPollTimeMs = 10000;
 
 EventLoop::EventLoop()
     : looping_(false),
       quit_(false),
       poller_(new Poller(this)),
-      threadId_(util::currentTid())
+      threadId_(util::currentTid()),
+      timerQueue_(new TimerQueue(this))
 {
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
@@ -84,4 +87,20 @@ void EventLoop::updateChannel(Channel* channel) {
     assertInLoopThread();
     poller_->updateChannel(channel);
 }
+
+TimerId EventLoop::runAt(const Timestamp time, const TimerCallback &cb) {
+    return timerQueue_->addTimer(cb, time, 0.0);
+}
+
+TimerId EventLoop::runAfter(double delay, const TimerCallback &cb) {
+    Timestamp time = util::getTimeOfNow() + (int64_t) (delay * 1000000);
+    return runAt(time, cb);
+}
+
+TimerId EventLoop::runEvery(double interval, const TimerCallback &cb) {
+    Timestamp time = util::getTimeOfNow() + (int64_t) (interval * 1000000);
+    return timerQueue_->addTimer(cb, time, interval * 1000000);
+}
+
+
 
