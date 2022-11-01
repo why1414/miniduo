@@ -25,7 +25,7 @@ void print(const char *msg){
 
 int main()
 {
-//   set_logLevel(Logger::LogLevel::DEBUG);
+  set_logLevel(Logger::LogLevel::DEBUG);
   printTid();
   miniduo::EventLoop loop;
   g_loop = &loop;

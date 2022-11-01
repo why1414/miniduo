@@ -43,24 +43,32 @@ TimerQueue::~TimerQueue() {
     }
 }
 
-/// FIXME: make it thread safe
+/// thread safe
 TimerId TimerQueue::addTimer(const TimerCallback& cb,
                              Timestamp when,
                              double interval)
 {
     Timer* timer = new Timer(cb, when, interval);
-    bool earliestChanged = insert(timer);
-    if(earliestChanged)
-        resetTimerfd(timerfd_, timer->expiration());
+    loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, timer));
     return TimerId{when,timer};
 }     
+
+void TimerQueue::addTimerInLoop(Timer* timer) {
+    loop_->assertInLoopThread();
+    bool earliestChanged = insert(timer);
+    if(earliestChanged) {
+        resetTimerfd(timerfd_, timer->expiration());
+    }
+}
 
 void TimerQueue::handleRead() {
     // handleRead will be called in EventLoop::loop()
     loop_->assertInLoopThread();
+    log_trace("Handling timers...");
     Timestamp now = util::getTimeOfNow();
     readTimerfd(timerfd_, now);
     std::vector<TimerId> expired = getExpired(now);
+    log_trace("Total alarmed timers are %d", expired.size());
     for(std::vector<TimerId>::iterator it = expired.begin();
         it != expired.end();
         ++it)
@@ -69,6 +77,7 @@ void TimerQueue::handleRead() {
     }
     // add repeatable Timer back to TimerQueue;
     reset(expired, now);
+    log_trace("timers_.size() == %d", timers_.size());
 }
 
 // 从timers_中移除已到期Timer，通过vector返回它们
@@ -84,7 +93,7 @@ std::vector<TimerId> TimerQueue::getExpired(Timestamp now) {
 }
 
 void TimerQueue::reset(const std::vector<TimerId>& expired, Timestamp now) {
-    Timestamp nextExpire;
+    Timestamp nextExpire = 0;
     for(std::vector<TimerId>::const_iterator it = expired.begin();
         it != expired.end();
         ++it )
@@ -131,7 +140,7 @@ int createTimerfd() {
 
 void readTimerfd(int timerfd, Timestamp now) {
     uint64_t howmany;
-    ssize_t n = ::read(timerfd, &howmany, sizeof(howmany));
+    ssize_t n = ::read(timerfd, &howmany, sizeof howmany);
     log_trace("TimerQueue::handleRead() %ld at %ld ms", howmany, now);
     if(n != sizeof(howmany)) {
         log_fatal("TimerQueue::handleRead() reads %ld bytes instead of 8", n);
@@ -145,15 +154,11 @@ void resetTimerfd(int timerfd, Timestamp expiration) {
     if(microseconds < 100) {
         microseconds = 100;
     }
-    struct timespec ts;
-    ts.tv_sec = static_cast<time_t>
-                (microseconds / int(1000000));
-    ts.tv_nsec = static_cast<long>
-                ((microseconds % int(1000000)) * 1000);
     
     struct itimerspec newValue;
-    memset(&newValue, 0, sizeof(newValue));
-    newValue.it_value = ts;
+    memset(&newValue, 0, sizeof newValue);
+    newValue.it_value.tv_sec = static_cast<time_t> (microseconds / 1000000);
+    newValue.it_value.tv_nsec = static_cast<long> (microseconds % 1000000) * 1000;
     int ret = ::timerfd_settime(timerfd, 0, &newValue, nullptr);
     if(ret) {
         log_trace("timerfd_settime()");

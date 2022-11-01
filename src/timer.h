@@ -31,10 +31,10 @@ public:
     void run() const { callback_(); }
     Timestamp expiration() const { return expiration_;}
     bool repeat() const { return repeat_; }
-    // restart the timer, if repeatable, new expiration = now + interval
+    // restart the timer, if repeatable, new expiration = now + interval * 10e6
     // if not, expiration = 0;
     void restart(Timestamp now) {
-        expiration_ = repeat_ ? now + interval_ : 0;
+        expiration_ = repeat_ ? now + interval_ * 1000000 : 0;
     };
 
 private:
@@ -74,6 +74,8 @@ private:
     /// @brief  Insert a new timer ptr into timers_
     /// @return return true if the earliest expiration in timers_ changed
     bool insert(Timer* timer);
+    /// @brief add timer in EventLoop thread
+    void addTimerInLoop(Timer* timer);
 
     EventLoop* loop_; // owner loop;
     const int timerfd_;

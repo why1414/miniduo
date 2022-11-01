@@ -8,19 +8,34 @@
 #include <cassert>
 #include <poll.h> 
 #include <iostream>
+#include <unistd.h>
+#include <sys/eventfd.h> // ::eventfd()
 
 using namespace miniduo;
 __thread EventLoop* t_loopInThisThread = 0;
 
-extern Timestamp getTimeOfNow();
+// extern Timestamp getTimeOfNow();
 const int kPollTimeMs = 10000;
+
+int createEventfd() {
+    int evtfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if(evtfd < 0) {
+        log_fatal("Failed in eventfd");
+        abort(); // stdlib.h
+    }
+   
+    return evtfd;
+}
 
 EventLoop::EventLoop()
     : looping_(false),
       quit_(false),
+      callingPendingTasking_(false),
       poller_(new Poller(this)),
       threadId_(util::currentTid()),
-      timerQueue_(new TimerQueue(this))
+      timerQueue_(new TimerQueue(this)),
+      wakeupFd_(createEventfd()),
+      wakeupChannel_(new Channel(this, wakeupFd_))
 {
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
@@ -33,6 +48,11 @@ EventLoop::EventLoop()
     else {
         t_loopInThisThread = this;
     }
+    wakeupChannel_->setReadCallback(
+        std::bind(&EventLoop::handleRead,this)
+    );
+    wakeupChannel_->enableReading();
+
 }
 
 EventLoop::~EventLoop(){
@@ -49,7 +69,6 @@ void EventLoop::loop(){
     assertInLoopThread();
     looping_ = true;
     quit_ = false;
-
     while(!quit_) {
         activeChannels_.clear();
         poller_->poll(kPollTimeMs, &activeChannels_);
@@ -59,6 +78,7 @@ void EventLoop::loop(){
         {
             (*it)->handleEvent();
         }
+        doPendingTasks();
 
     }
 
@@ -73,13 +93,17 @@ void EventLoop::abortNotInLoopThread(){
     // log
     // log<<" Abort\n";
     log_fatal("Abort! not in Loop Thread");
-    pthread_exit(nullptr);
+    // pthread_exit(nullptr);
+    abort();
 }
 
 // 如果 loop() 正阻塞在某个调用，quit() 不会立刻生效
+// 如果其他线程唤醒IO线程，则polling马上返回 
 void EventLoop::quit() {
     quit_ = true;
-    // wakeup()
+    if(!isInLoopThread()) {
+        wakeup();
+    }
 }
 
 void EventLoop::updateChannel(Channel* channel) {
@@ -93,13 +117,63 @@ TimerId EventLoop::runAt(const Timestamp time, const TimerCallback &cb) {
 }
 
 TimerId EventLoop::runAfter(double delay, const TimerCallback &cb) {
-    Timestamp time = util::getTimeOfNow() + (int64_t) (delay * 1000000);
+    Timestamp time = util::getTimeOfNow() + (Timestamp) (delay * 1000000);
     return runAt(time, cb);
 }
 
 TimerId EventLoop::runEvery(double interval, const TimerCallback &cb) {
-    Timestamp time = util::getTimeOfNow() + (int64_t) (interval * 1000000);
-    return timerQueue_->addTimer(cb, time, interval * 1000000);
+    Timestamp time = util::getTimeOfNow() + (Timestamp) (interval * 1000000);
+    return timerQueue_->addTimer(cb, time, interval);
+}
+
+void EventLoop::runInLoop(const Task& cb) {
+    if(isInLoopThread()) {
+        cb();
+    }
+    else {
+        queueInLoop(cb);
+    }
+}
+
+void EventLoop::queueInLoop(const Task& cb) {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        pendingTasks_.push_back(cb);
+    }
+    if(!isInLoopThread() || callingPendingTasking_) {
+        wakeup();
+    }
+}
+
+void EventLoop::doPendingTasks() {
+    std::vector<Task> tasks;
+    callingPendingTasking_ = true;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        tasks.swap(pendingTasks_);
+    }
+    for(const Task& task: tasks) {
+        task();
+    }
+    callingPendingTasking_ = false;
+}
+
+void EventLoop::wakeup() {
+    uint64_t one = 1;
+    ssize_t n = ::write(wakeupFd_, &one, sizeof one);
+    if(n != sizeof one) {
+        log_error("EventLoop::wakeup() writes %ld bytes instread %ld",n ,sizeof one);
+    }
+    
+} 
+
+void EventLoop::handleRead() {
+    uint64_t one = 1;
+    ssize_t n = ::read(wakeupFd_, &one, sizeof one);
+    if(n != sizeof one) {
+        log_error("EventLoop::handleRead() reads %ld bytes instead of %ld", n, sizeof one);
+    }
+
 }
 
 

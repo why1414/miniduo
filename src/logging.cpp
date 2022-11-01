@@ -17,7 +17,7 @@ Logger::Logger(LogLevel level = LogLevel::TRACE,
     : level_(level),
       fileBaseName_(fileBaseName),
       rotateInterval_(rotateInterval),
-      lastRotate_(time(NULL)),
+      lastRotate_(time(nullptr)),
       fd_(1),
       stopLogging_(false),
       backendThread_(std::thread(&Logger::process, this))
