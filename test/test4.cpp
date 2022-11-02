@@ -25,7 +25,7 @@ void print(const char *msg){
 
 int main()
 {
-  set_logLevel(Logger::LogLevel::DEBUG);
+//   set_logLevel(Logger::LogLevel::DEBUG);
   printTid();
   miniduo::EventLoop loop;
   g_loop = &loop;
@@ -37,6 +37,9 @@ int main()
   loop.runAfter(3.5, std::bind(print, "once3.5"));
   loop.runEvery(2,   std::bind(print, "every2"));
   loop.runEvery(3,   std::bind(print, "every3"));
+  loop.runAfter(4, std::bind(print, "once4"));
+  loop.runAfter(5, std::bind(print, "once5"));
+  loop.runAfter(6, std::bind(print, "once6"));
   
 
   loop.loop();

@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <memory> // shared_ptr weak_ptr
 #include <set>
 #include <functional> // std::function<>
 #include "channel.h" //不添加 timerfdChannel_ 报错
@@ -11,7 +12,8 @@ class Channel;
 class Timer;
 
 typedef int64_t Timestamp; // microseconds since the epoch
-typedef std::pair<Timestamp, Timer*> TimerId;
+// typedef std::pair<Timestamp, Timer*> TimerId;
+typedef std::weak_ptr<Timer> TimerId;
 typedef std::function<void()> TimerCallback;
 
 
@@ -62,20 +64,20 @@ public:
     // void cancel(TimerId timerId)
 
 private:
-    
-    typedef std::set<TimerId> TimerList;
+    typedef std::pair<Timestamp, std::shared_ptr<Timer>> TimerEntry; /// 
+    typedef std::set<TimerEntry> TimerList;
 
     // canlled when timerfd alarms
     void handleRead();
     // move out all expired timers
-    std::vector<TimerId> getExpired(Timestamp now);
+    std::vector<TimerEntry> getExpired(Timestamp now);
     /// @brief Add repeatable Timers in arg-expired back to timers_
-    void reset(const std::vector<TimerId>& expired, Timestamp now);
+    void reset(const std::vector<TimerEntry>& expired, Timestamp now);
     /// @brief  Insert a new timer ptr into timers_
     /// @return return true if the earliest expiration in timers_ changed
-    bool insert(Timer* timer);
+    bool insert(std::shared_ptr<Timer> timer);
     /// @brief add timer in EventLoop thread
-    void addTimerInLoop(Timer* timer);
+    void addTimerInLoop(std::shared_ptr<Timer> timer);
 
     EventLoop* loop_; // owner loop;
     const int timerfd_;

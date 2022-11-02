@@ -34,13 +34,7 @@ TimerQueue::~TimerQueue() {
     // delete all Timers
     // ??? do not remove channel, since we're in EventLoop::dtor();
     // Guess: in EventLoop::dtor(), there're still some channels, if remove the channel,
-    // it will disorder channel vector/array.
-    for(TimerList::iterator it = timers_.begin();
-        it != timers_.end();
-        ++it)
-    {
-        delete it->second;
-    }
+    //        it will disorder channel vector/array.
 }
 
 /// thread safe
@@ -48,16 +42,20 @@ TimerId TimerQueue::addTimer(const TimerCallback& cb,
                              Timestamp when,
                              double interval)
 {
-    Timer* timer = new Timer(cb, when, interval);
-    loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, timer));
-    return TimerId{when,timer};
+    // Timer* timer = new Timer(cb, when, interval);
+    log_trace("Enter addTimer");
+    auto timer = std::make_shared<Timer>(cb, when, interval);
+    TimerId id = timer;
+    loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, std::move(timer)));
+    return id;
 }     
 
-void TimerQueue::addTimerInLoop(Timer* timer) {
+void TimerQueue::addTimerInLoop(std::shared_ptr<Timer> timer) {
     loop_->assertInLoopThread();
-    bool earliestChanged = insert(timer);
+    Timestamp when = timer->expiration();
+    bool earliestChanged = insert(std::move(timer));
     if(earliestChanged) {
-        resetTimerfd(timerfd_, timer->expiration());
+        resetTimerfd(timerfd_, when);
     }
 }
 
@@ -67,9 +65,9 @@ void TimerQueue::handleRead() {
     log_trace("Handling timers...");
     Timestamp now = util::getTimeOfNow();
     readTimerfd(timerfd_, now);
-    std::vector<TimerId> expired = getExpired(now);
+    std::vector<TimerEntry> expired = getExpired(now);
     log_trace("Total alarmed timers are %d", expired.size());
-    for(std::vector<TimerId>::iterator it = expired.begin();
+    for(std::vector<TimerEntry>::iterator it = expired.begin();
         it != expired.end();
         ++it)
     {
@@ -81,30 +79,30 @@ void TimerQueue::handleRead() {
 }
 
 // 从timers_中移除已到期Timer，通过vector返回它们
-std::vector<TimerId> TimerQueue::getExpired(Timestamp now) {
-    std::vector<TimerId> expired;
-    // 设置哨兵值
-    TimerId sentry{now, reinterpret_cast<Timer*>(UINTPTR_MAX)};
+std::vector<TimerQueue::TimerEntry> TimerQueue::getExpired(Timestamp now) {
+    std::vector<TimerEntry> expired;
+    // 设置哨兵值, now timepoing + 1us;
+    TimerEntry sentry(now+1, std::shared_ptr<Timer>()); 
     TimerList::iterator it = timers_.lower_bound(sentry);
     assert(it == timers_.end() || now < it->first);
+    // ??? 此处 copy 能不能使用移动构造 ，因为后面还会使用 timers_。
+    // ??? timers_ 是set结构，移动后会不会改变其组织结构，会使后面 it 迭代器失效。
+    // 测试发现 set 中元素移动不一定会清空源元素，保险起见不使用 make_move_iterator,
+    // 因为下一步就会在timers_将到期timer移除，timer 的引用计数也会马上回归为 1 
     std::copy(timers_.begin(), it, back_inserter(expired));
     timers_.erase(timers_.begin(), it);
     return expired;
 }
 
-void TimerQueue::reset(const std::vector<TimerId>& expired, Timestamp now) {
+void TimerQueue::reset(const std::vector<TimerEntry>& expired, Timestamp now) {
     Timestamp nextExpire = 0;
-    for(std::vector<TimerId>::const_iterator it = expired.begin();
+    for(std::vector<TimerEntry>::const_iterator it = expired.begin();
         it != expired.end();
         ++it )
     {
         if(it->second->repeat()) {
             it->second->restart(now);
-            insert(it->second);
-        }
-        else {
-            /// FIXME: move to a free list
-            delete it->second;
+            insert(std::move(it->second));
         }
     }
     // reset next alarm timestamp of timerfd_
@@ -117,14 +115,14 @@ void TimerQueue::reset(const std::vector<TimerId>& expired, Timestamp now) {
 
 }
 
-bool TimerQueue::insert(Timer* timer) {
+bool TimerQueue::insert(std::shared_ptr<Timer> timer) {
     bool earliestChanged = false;
     Timestamp when = timer->expiration();
     TimerList::iterator it = timers_.begin();
     if(it == timers_.end() || when < it->first) {
         earliestChanged = true;
     }
-    auto result = timers_.insert(std::make_pair(when, timer));
+    auto result = timers_.insert(std::make_pair(when, std::move(timer)));
     assert(result.second);
     return earliestChanged;
 }
