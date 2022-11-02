@@ -11,8 +11,10 @@
 #include <unistd.h>
 #include <sys/eventfd.h> // ::eventfd()
 
-using namespace miniduo;
-__thread EventLoop* t_loopInThisThread = 0;
+namespace  miniduo
+{
+
+__thread EventLoop* t_loopInThisThread = nullptr;
 
 // extern Timestamp getTimeOfNow();
 const int kPollTimeMs = 10000;
@@ -27,12 +29,18 @@ int createEventfd() {
     return evtfd;
 }
 
+} // namespace  miniduo
+
+
+
+using namespace miniduo;
+
+
+
+
 EventLoop::EventLoop()
-    : looping_(false),
-      quit_(false),
-      callingPendingTasking_(false),
+    : stoplooping_(true),
       poller_(new Poller(this)),
-      threadId_(util::currentTid()),
       timerQueue_(new TimerQueue(this)),
       wakeupFd_(createEventfd()),
       wakeupChannel_(new Channel(this, wakeupFd_))
@@ -40,14 +48,12 @@ EventLoop::EventLoop()
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
 
-    log_trace("EventLoop created %p in thread %d", this, threadId_);
+    log_trace("EventLoop created %p in thread %d", this, util::currentTid());
     if (t_loopInThisThread){
         // log fatal another EventLoop exists in this thread
-        log_fatal("Another EventLoop %p exists in this thread %d", t_loopInThisThread, threadId_);
+        log_trace("Another EventLoop %p exists in this thread %d", t_loopInThisThread, util::currentTid());
     }
-    else {
-        t_loopInThisThread = this;
-    }
+    
     wakeupChannel_->setReadCallback(
         std::bind(&EventLoop::handleRead,this)
     );
@@ -56,20 +62,29 @@ EventLoop::EventLoop()
 }
 
 EventLoop::~EventLoop(){
-    assert(!looping_);
-    t_loopInThisThread = nullptr;
+    assert(stoplooping_);
+    if(isInLoopThread()) {
+        t_loopInThisThread = nullptr;
+    }
+    
 }
 
 EventLoop* EventLoop::getEventLoopOfCurrentThread(){
     return t_loopInThisThread;
 }
 
+bool EventLoop::isInLoopThread() {
+    if(t_loopInThisThread == nullptr) {
+        t_loopInThisThread = this;
+    }
+    return t_loopInThisThread == this;
+}
+
 void EventLoop::loop(){
-    assert(!looping_);
+    assert(stoplooping_);
     assertInLoopThread();
-    looping_ = true;
-    quit_ = false;
-    while(!quit_) {
+    stoplooping_ = false;
+    while(!stoplooping_) {
         activeChannels_.clear();
         poller_->poll(kPollTimeMs, &activeChannels_);
         for(ChannelList::iterator it = activeChannels_.begin();
@@ -79,14 +94,12 @@ void EventLoop::loop(){
             (*it)->handleEvent();
         }
         doPendingTasks();
-
     }
 
     // ::poll(nullptr, 0, 5*1000);
 
     // log trace Eventloop stop looping
     log_trace("EventLoop %p stop looping", this);
-    looping_ = false;
 }
 
 void EventLoop::abortNotInLoopThread(){
@@ -100,7 +113,7 @@ void EventLoop::abortNotInLoopThread(){
 // 如果 loop() 正阻塞在某个调用，quit() 不会立刻生效
 // 如果其他线程唤醒IO线程，则polling马上返回 
 void EventLoop::quit() {
-    quit_ = true;
+    stoplooping_ = true;
     if(!isInLoopThread()) {
         wakeup();
     }
@@ -132,12 +145,6 @@ void EventLoop::cancel(TimerId timerId) {
 
 void EventLoop::runInLoop(const Task& cb) {
     queueInLoop(cb);
-    // if(isInLoopThread()) {
-    //     cb();
-    // }
-    // else {
-    //     queueInLoop(cb);
-    // }
 }
 
 void EventLoop::queueInLoop(const Task& cb) {
@@ -146,14 +153,10 @@ void EventLoop::queueInLoop(const Task& cb) {
         pendingTasks_.push_back(cb);
     }
     wakeup();
-    if(!isInLoopThread() || callingPendingTasking_) {
-        wakeup();
-    }
 }
 
 void EventLoop::doPendingTasks() {
     std::vector<Task> tasks;
-    callingPendingTasking_ = true;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         tasks.swap(pendingTasks_);
@@ -161,7 +164,6 @@ void EventLoop::doPendingTasks() {
     for(const Task& task: tasks) {
         task();
     }
-    callingPendingTasking_ = false;
 }
 
 void EventLoop::wakeup() {

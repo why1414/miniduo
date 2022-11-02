@@ -45,10 +45,9 @@ public:
             abortNotInLoopThread();
         }
     }
-
-    bool isInLoopThread() const {
-        return threadId_ == util::currentTid();
-    }
+    /// @brief 判断当前 线程是否有 已经有loop注册，若有检查是不是自己注册的；
+    /// 如果没有，就在当前线程注册自己 
+    bool isInLoopThread() ;
 
     static EventLoop* getEventLoopOfCurrentThread();
 
@@ -59,10 +58,7 @@ private:
     
     typedef std::vector<Channel*> ChannelList;
     
-    std::atomic<bool> looping_; /* atomic */
-    std::atomic<bool> quit_ ;   /* atomic */
-    std::atomic<bool> callingPendingTasking_;
-    const pid_t threadId_;
+    std::atomic<bool> stoplooping_; /* atomic */
     std::unique_ptr<Poller> poller_;
     std::unique_ptr<TimerQueue> timerQueue_;
     ChannelList activeChannels_;

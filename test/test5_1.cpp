@@ -13,7 +13,7 @@ void threadFunc() {
 }
 
 int main() {
-    // set_logLevel(Logger::LogLevel::DEBUG);
+    set_logLevel(Logger::LogLevel::DEBUG);
     miniduo::EventLoop loop;
     g_loop = &loop;
     std::thread t(threadFunc);
