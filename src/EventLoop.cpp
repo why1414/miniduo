@@ -126,13 +126,18 @@ TimerId EventLoop::runEvery(double interval, const TimerCallback &cb) {
     return timerQueue_->addTimer(cb, time, interval);
 }
 
+void EventLoop::cancel(TimerId timerId) {
+    timerQueue_->cancelTimer(timerId);
+}
+
 void EventLoop::runInLoop(const Task& cb) {
-    if(isInLoopThread()) {
-        cb();
-    }
-    else {
-        queueInLoop(cb);
-    }
+    queueInLoop(cb);
+    // if(isInLoopThread()) {
+    //     cb();
+    // }
+    // else {
+    //     queueInLoop(cb);
+    // }
 }
 
 void EventLoop::queueInLoop(const Task& cb) {
@@ -140,6 +145,7 @@ void EventLoop::queueInLoop(const Task& cb) {
         std::lock_guard<std::mutex> lock(mutex_);
         pendingTasks_.push_back(cb);
     }
+    wakeup();
     if(!isInLoopThread() || callingPendingTasking_) {
         wakeup();
     }

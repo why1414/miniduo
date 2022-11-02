@@ -10,12 +10,52 @@
 #include <sys/time.h> // gettimeofday() unused !!!
 #include <chrono> 
 
-using namespace miniduo;
 
-//  timerfd helper funtions
-int createTimerfd();
-void readTimerfd(int timerfd, Timestamp now);
-void resetTimerfd(int timerfd, Timestamp expiration);
+namespace miniduo {
+//  3 timerfd helper funtions
+int createTimerfd() {
+    int timerfd = ::timerfd_create(CLOCK_MONOTONIC,
+                                    TFD_NONBLOCK | TFD_CLOEXEC);
+    if(timerfd < 0) {
+        log_fatal("Failed in timerfd_create");
+    }
+    return timerfd;
+}
+
+void readTimerfd(int timerfd, Timestamp now) {
+    uint64_t howmany;
+    ssize_t n = ::read(timerfd, &howmany, sizeof howmany);
+    log_trace("TimerQueue::handleRead() %ld at %ld ms", howmany, now);
+    if(n != sizeof(howmany)) {
+        log_fatal("TimerQueue::handleRead() reads %ld bytes instead of 8", n);
+    }
+}
+
+void resetTimerfd(int timerfd, Timestamp expiration) {
+    Timestamp now = util::getTimeOfNow();
+    int64_t microseconds = expiration - now;
+    // minium interval since next timeout is 100us
+    if(microseconds < 100) {
+        microseconds = 100;
+    }
+    
+    struct itimerspec newValue;
+    memset(&newValue, 0, sizeof newValue);
+    newValue.it_value.tv_sec = static_cast<time_t> (microseconds / 1000000);
+    newValue.it_value.tv_nsec = static_cast<long> (microseconds % 1000000) * 1000;
+    int ret = ::timerfd_settime(timerfd, 0, &newValue, nullptr);
+    if(ret) {
+        log_trace("timerfd_settime()");
+    }
+
+}
+
+} // namespace miniduo
+
+
+
+
+using namespace miniduo;
 
 TimerQueue::TimerQueue(EventLoop* loop)
     : loop_(loop),
@@ -59,6 +99,30 @@ void TimerQueue::addTimerInLoop(std::shared_ptr<Timer> timer) {
     }
 }
 
+void TimerQueue::cancelTimer(TimerId timerId) {
+    if(timerId.expired()) {
+        return;
+    }
+    loop_->runInLoop(std::bind(&TimerQueue::cancelTimerInLoop, this, timerId));
+}
+
+void TimerQueue::cancelTimerInLoop(TimerId timerId) {
+    loop_->assertInLoopThread();
+    if(std::shared_ptr<Timer> timer = timerId.lock()) {
+        TimerEntry timerEntry(timer->expiration(), timer);
+        TimerList::iterator it = timers_.find(timerEntry);
+        if(it != timers_.end()) {
+            /// FIXME: 判断是否成功
+            timers_.erase(it);
+        }
+        else {
+            /// FIXME: 当在 queueInLoop 不需要此，当在handle timers 中调用cancelTimer()
+            timer->setUnrepeat();
+        }
+    }
+}
+
+
 void TimerQueue::handleRead() {
     // handleRead will be called in EventLoop::loop()
     loop_->assertInLoopThread();
@@ -81,10 +145,12 @@ void TimerQueue::handleRead() {
 // 从timers_中移除已到期Timer，通过vector返回它们
 std::vector<TimerQueue::TimerEntry> TimerQueue::getExpired(Timestamp now) {
     std::vector<TimerEntry> expired;
-    // 设置哨兵值, now timepoing + 1us;
+    
+    // 设置哨兵值, now timepoing + 1us; 可能会把提前 1us 的定时器取出，误差可接受
     TimerEntry sentry(now+1, std::shared_ptr<Timer>()); 
     TimerList::iterator it = timers_.lower_bound(sentry);
     assert(it == timers_.end() || now < it->first);
+
     // ??? 此处 copy 能不能使用移动构造 ，因为后面还会使用 timers_。
     // ??? timers_ 是set结构，移动后会不会改变其组织结构，会使后面 it 迭代器失效。
     // 测试发现 set 中元素移动不一定会清空源元素，保险起见不使用 make_move_iterator,
@@ -127,42 +193,7 @@ bool TimerQueue::insert(std::shared_ptr<Timer> timer) {
     return earliestChanged;
 }
 
-int createTimerfd() {
-    int timerfd = ::timerfd_create(CLOCK_MONOTONIC,
-                                    TFD_NONBLOCK | TFD_CLOEXEC);
-    if(timerfd < 0) {
-        log_fatal("Failed in timerfd_create");
-    }
-    return timerfd;
-}
 
-void readTimerfd(int timerfd, Timestamp now) {
-    uint64_t howmany;
-    ssize_t n = ::read(timerfd, &howmany, sizeof howmany);
-    log_trace("TimerQueue::handleRead() %ld at %ld ms", howmany, now);
-    if(n != sizeof(howmany)) {
-        log_fatal("TimerQueue::handleRead() reads %ld bytes instead of 8", n);
-    }
-}
-
-void resetTimerfd(int timerfd, Timestamp expiration) {
-    Timestamp now = util::getTimeOfNow();
-    int64_t microseconds = expiration - now;
-    // minium interval since next timeout is 100us
-    if(microseconds < 100) {
-        microseconds = 100;
-    }
-    
-    struct itimerspec newValue;
-    memset(&newValue, 0, sizeof newValue);
-    newValue.it_value.tv_sec = static_cast<time_t> (microseconds / 1000000);
-    newValue.it_value.tv_nsec = static_cast<long> (microseconds % 1000000) * 1000;
-    int ret = ::timerfd_settime(timerfd, 0, &newValue, nullptr);
-    if(ret) {
-        log_trace("timerfd_settime()");
-    }
-
-}
 // /// @brief 
 // /// @return return time (microsecond) since epoch
 // Timestamp getTimeOfNow() {

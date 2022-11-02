@@ -23,27 +23,28 @@ class Timer {
     Timer(const Timer&) = delete;
     Timer& operator=(const Timer&) = delete;
 public:
-    Timer(const TimerCallback& cb, Timestamp when, double interval)
+    Timer(const TimerCallback& cb, const Timestamp& when, const double& interval)
         : callback_(cb),
           expiration_(when),
-          interval_(interval),
-          repeat_(interval > 0.0)
+          interval_(interval)
     {}
 
     void run() const { callback_(); }
     Timestamp expiration() const { return expiration_;}
-    bool repeat() const { return repeat_; }
+    bool repeat() const { return interval_ > 0.0; }
+    void setUnrepeat() {
+        interval_ = 0.0;
+    }
     // restart the timer, if repeatable, new expiration = now + interval * 10e6
     // if not, expiration = 0;
     void restart(Timestamp now) {
-        expiration_ = repeat_ ? now + interval_ * 1000000 : 0;
+        expiration_ = repeat() ? now + interval_ * 1000000 : 0;
     };
 
 private:
     const TimerCallback callback_;
     Timestamp expiration_;
-    const double interval_;
-    const bool repeat_;
+    double interval_;
 
 }; // class Timer
 
@@ -61,7 +62,7 @@ public:
                      Timestamp when,
                      double interval);
     
-    // void cancel(TimerId timerId)
+    void cancelTimer(TimerId timerId);
 
 private:
     typedef std::pair<Timestamp, std::shared_ptr<Timer>> TimerEntry; /// 
@@ -78,6 +79,7 @@ private:
     bool insert(std::shared_ptr<Timer> timer);
     /// @brief add timer in EventLoop thread
     void addTimerInLoop(std::shared_ptr<Timer> timer);
+    void cancelTimerInLoop(TimerId timerId);
 
     EventLoop* loop_; // owner loop;
     const int timerfd_;

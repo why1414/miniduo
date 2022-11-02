@@ -6,6 +6,7 @@
 #include <functional>
 #include "util.h"
 #include "logging.h"
+#include "time.h"
 
 int cnt = 0;
 miniduo::EventLoop *g_loop;
@@ -25,22 +26,24 @@ void print(const char *msg){
 
 int main()
 {
-//   set_logLevel(Logger::LogLevel::DEBUG);
+  set_logLevel(Logger::LogLevel::DEBUG);
   printTid();
   miniduo::EventLoop loop;
   g_loop = &loop;
 
   print("main");
-  loop.runAfter(1.0,   std::bind(print, "once1"));
+  loop.runAfter(1,   std::bind(print, "once1"));
   loop.runAfter(1.5, std::bind(print, "once1.5"));
   loop.runAfter(2.5, std::bind(print, "once2.5"));
   loop.runAfter(3.5, std::bind(print, "once3.5"));
-  loop.runEvery(2,   std::bind(print, "every2"));
-  loop.runEvery(3,   std::bind(print, "every3"));
+  miniduo::TimerId id = loop.runEvery(2,   std::bind(print, "every2"));
+  miniduo::TimerId id3 = loop.runEvery(3,   std::bind(print, "every3"));
   loop.runAfter(4, std::bind(print, "once4"));
   loop.runAfter(5, std::bind(print, "once5"));
-  loop.runAfter(6, std::bind(print, "once6"));
-  
+  loop.runAfter(6.1, std::bind(print, "once6"));
+
+  loop.cancel(id);
+  loop.runAfter(18.001, std::bind(&miniduo::EventLoop::cancel, &loop, id3));
 
   loop.loop();
   print("main loop exits");
