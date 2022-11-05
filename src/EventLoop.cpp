@@ -37,19 +37,18 @@ using namespace miniduo;
 
 
 
-
+/// FIXME: 同一线程创建多个EventLoop 会冲突， 在timerQueue，和wakeupChannel往 poller中注册时
 EventLoop::EventLoop()
     : stoplooping_(true),
-      poller_(new Poller(this)),
-      timerQueue_(new TimerQueue(this)),
+      poller_(new Poller(this)),     
       wakeupFd_(createEventfd()),
       wakeupChannel_(new Channel(this, wakeupFd_))
-{
+    //   timerQueue_(new TimerQueue(this))
+{   
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
-
     log_trace("EventLoop created %p in thread %d", this, util::currentTid());
-    if (t_loopInThisThread){
+    if (t_loopInThisThread != nullptr){
         // log fatal another EventLoop exists in this thread
         log_trace("Another EventLoop %p exists in this thread %d", t_loopInThisThread, util::currentTid());
     }
@@ -57,8 +56,10 @@ EventLoop::EventLoop()
     wakeupChannel_->setReadCallback(
         std::bind(&EventLoop::handleRead,this)
     );
-    wakeupChannel_->enableReading();
-
+    // wakeupChannel_->enableReading();
+    runInLoop(std::bind(&Channel::enableReading, this->wakeupChannel_.get()));
+    timerQueue_.reset(new TimerQueue(this));
+ 
 }
 
 EventLoop::~EventLoop(){
@@ -85,6 +86,7 @@ void EventLoop::loop(){
     assertInLoopThread();
     stoplooping_ = false;
     while(!stoplooping_) {
+        doPendingTasks();
         activeChannels_.clear();
         poller_->poll(kPollTimeMs, &activeChannels_);
         for(ChannelList::iterator it = activeChannels_.begin();
@@ -93,7 +95,7 @@ void EventLoop::loop(){
         {
             (*it)->handleEvent();
         }
-        doPendingTasks();
+        
     }
 
     // ::poll(nullptr, 0, 5*1000);
@@ -148,6 +150,7 @@ void EventLoop::runInLoop(const Task& cb) {
 }
 
 void EventLoop::queueInLoop(const Task& cb) {
+    
     {
         std::lock_guard<std::mutex> lock(mutex_);
         pendingTasks_.push_back(cb);

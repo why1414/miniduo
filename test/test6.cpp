@@ -21,7 +21,7 @@ int main() {
     // miniduo::EventLoop loop;
     std::thread t([] { static EventLoop tloop;
                        g_loop = &tloop;
-                       std::lock_guard<std::mutex> lock(lk);
+                      
                        tloop.loop();});
     sleep(15);
     g_loop->runInLoop(threadFunc);
@@ -30,12 +30,11 @@ int main() {
     sleep(15);
     g_loop->quit();
 
-    std::lock_guard<std::mutex> lock(lk);
-    
+    t.join();
     set_logLevel(Logger::LogLevel::DEBUG);
     printf("restarting the loop\n");
     g_loop->loop();
     printf("exit main().\n");
-    t.join();
+    
     return 0;
 }

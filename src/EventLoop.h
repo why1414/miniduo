@@ -25,6 +25,7 @@ class EventLoop {
 public:
     EventLoop();
     ~EventLoop();
+    
     typedef std::function<void()> Task;
 
     void loop();

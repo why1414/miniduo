@@ -73,7 +73,7 @@ void Poller::fillActiveChannels(int numEvents,
 void Poller::updateChannel(Channel* channel) {
     assertInLoopThread();
     // log << "fd = " << channel->fd() << " events = " << channel->events();
-    log_trace("fd = %d, events = %d", channel->fd(), channel->events());
+    log_trace("Poller update: fd = %d, intrested events = %d", channel->fd(), channel->events());
     if(channel->index() < 0) {
         // a new channel, add to pollfds_
         assert(channels_.find(channel->fd()) == channels_.end());

@@ -78,7 +78,7 @@ private:
     // static const std::string levelStrs_[7]; 
     std::string fileBaseName_;
     int fd_;
-    LogLevel level_;
+    LogLevel level_; /// FIXME: atomic
     long lastRotate_;
     long rotateInterval_;
 
