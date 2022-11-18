@@ -33,6 +33,13 @@ void Channel::handleEvent(){
         log_trace("Channel::handleEvent() POLLNVAL");
     }
 
+    if((revents_ & POLLHUP) && !(revents_ & POLLIN)) {
+        log_warn("Channel::handleEvent() POLLHUP");
+        if(closeCallback_) {
+            closeCallback_();
+        }
+    }
+
     if(revents_ & (POLLERR | POLLNVAL)) {
         if(errorCallback_) {
             errorCallback_();

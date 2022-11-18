@@ -60,6 +60,7 @@ public:
 
 private:
     void newConnection(int sockfd, const SockAddr& peerAddr);
+    void removeConnection(const TcpConnectionPtr& conn);
 
     typedef std::map<std::string, TcpConnectionPtr> ConnectionMap;
 
@@ -73,6 +74,7 @@ private:
     ConnectionMap connections_;
 
 }; // class TcpServer
+
 
 class TcpConnection : public std::enable_shared_from_this<TcpConnection>{
     
@@ -98,17 +100,23 @@ public:
     void setMsgCallback(const MsgCallback& cb) {
         msgCallback_ = cb;
     }
+    void setCloseCallback(const CloseCallback& cb) {
+        closeCallback_ = cb;
+    }
 
     void connectEstablished();
+    void connectDestroyed();
 
 private:
-    enum class StateE { kConnecting, kConnected };
+    enum class StateE { kConnecting, kConnected, kDisconnected, };
 
     void setState(StateE s) {
         state_ = s;
     }
     void handleRead();
-
+    void handleWrite();
+    void handleClose();
+    void handleError();
     EventLoop* loop_;
     std::string name_;
     StateE state_;
@@ -118,6 +126,7 @@ private:
     SockAddr peerAddr_;
     ConnectionCallback connectionCallback_;
     MsgCallback msgCallback_;
+    CloseCallback closeCallback_;
 
 
 }; // class TcpConnection

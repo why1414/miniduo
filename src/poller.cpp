@@ -90,19 +90,45 @@ void Poller::updateChannel(Channel* channel) {
         // update existing channel
         assert(channels_.find(channel->fd()) != channels_.end());
         assert(channels_[channel->fd()] == channel);
-        int idx = channel->fd();
+        int idx = channel->index();
         // ??? 当需要删除一些fd时 是否会出现错误
         assert(idx > 0 && idx < static_cast<int>(pollfds_.size()));
         struct pollfd& pfd = pollfds_[idx];
-        assert(pfd.fd == channel->fd() || pfd.fd == -1);
+        assert(pfd.fd == channel->fd() || pfd.fd == -channel->fd()-1);
         pfd.events = static_cast<short>(channel->events());
         pfd.revents = 0;
         if(channel->isNoneEvent()) {
             // ignore this pollfd, poll(2) 会忽略此pfd
-            pfd.fd = -1;
+            pfd.fd = -channel->fd()-1;
         }
 
     }
+}
+
+void Poller::removeChannel(Channel* channel) {
+    ownerLoop_->assertInLoopThread();
+    log_trace("fd = %d", channel->fd());
+    assert(channels_.find(channel->fd()) != channels_.end());
+    assert(channels_[channel->fd()] == channel);
+    assert(channel->isNoneEvent());
+    int idx = channel->index();
+    assert(0 <= idx && idx < static_cast<int>(pollfds_.size()));
+    const struct pollfd& pfd = pollfds_[idx];
+    size_t n = channels_.erase(channel->fd());
+    assert(n == 1);
+    if(static_cast<size_t>(idx) == pollfds_.size()-1) {
+        pollfds_.pop_back();
+    }
+    else {
+        int endFd = pollfds_.back().fd;
+        std::iter_swap(pollfds_.begin()+idx, pollfds_.end()-1);
+        if(endFd < 0) {
+            endFd = - endFd - 1;
+        }
+        channels_[endFd]->setIndex(idx);
+        pollfds_.pop_back();
+    }
+
 }
 
 

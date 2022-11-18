@@ -84,7 +84,19 @@ void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
     connections_[connName] = conn;
     conn->setConnectionCallback(connectionCallback_);
     conn->setMsgCallback(msgCallback_);
+    conn->setCloseCallback(
+        std::bind(&TcpServer::removeConnection, this, std::placeholders::_1)
+    );
     conn->connectEstablished();
+
+}
+
+void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
+    loop_->assertInLoopThread();
+    log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
+    size_t n = connections_.erase(conn->name());
+    assert( n == 1);
+    conn->getLoop()->runInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
 
 }
 
@@ -122,10 +134,42 @@ void TcpConnection::connectEstablished() {
     connectionCallback_(shared_from_this());
 }
 
+void TcpConnection::connectDestroyed() {
+    loop_->assertInLoopThread();
+    assert(state_ == StateE::kConnected);
+    setState(StateE::kDisconnected);
+    connChannel_->disableAll();
+    connectionCallback_(shared_from_this());
+    loop_->removeChannel(connChannel_.get());
+}
 
 void TcpConnection::handleRead() {
     char buf[65536];
     ssize_t n = ::read(connChannel_->fd(), buf, sizeof(buf));
-    msgCallback_(shared_from_this(), buf, n);
+    if(n > 0) {
+        msgCallback_(shared_from_this(), buf, n);
+    }
+    else if(n==0) {
+        handleClose();
+    }
+    else {
+        handleError();
+    }
+}
+
+void TcpConnection::handleClose() {
+    loop_->assertInLoopThread();
+    log_trace("TcpConnection::handleClose state = %d", state_);
+    assert(state_ == StateE::kConnected);
+    connChannel_->disableAll();
+    closeCallback_(shared_from_this());
+}
+
+void TcpConnection::handleError() {
+    log_error("TcpConnection::handleError()");
+}
+
+void TcpConnection::handleWrite() {
 
 }
+

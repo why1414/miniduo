@@ -31,9 +31,9 @@ public:
     bool isNoneEvent() const { return events_ == kNoneEvent; }
     // 将 readable event 添加到感兴趣事件中，并在poller更新
     void enableReading() { events_ |= kReadEvent; update(); }
-    // void enableWriting() { events_ |= kWriteEvent; update(); }
-    // void disableWriting() { events_ &= ~kWriteEvent; update(); }
-    // void disableAll() { events_ = kNoneEvent; update(); }
+    void enableWriting() { events_ |= kWriteEvent; update(); }
+    void disableWriting() { events_ &= ~kWriteEvent; update(); }
+    void disableAll() { events_ = kNoneEvent; update(); }
 
     // for Poller
     int index() { return index_; }
@@ -57,6 +57,7 @@ private:
     EventCallback readCallback_;
     EventCallback writeCallback_;
     EventCallback errorCallback_; 
+    EventCallback closeCallback_;
 
 }; // class channel
 

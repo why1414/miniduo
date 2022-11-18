@@ -12,5 +12,6 @@ typedef std::function<void (const TcpConnectionPtr&)> ConnectionCallback;
 typedef std::function<void (const TcpConnectionPtr&,
                             const char* data,
                             ssize_t len)> MsgCallback;
+typedef std::function<void (const TcpConnectionPtr&)> CloseCallback;
 
 } // namespace miniduo
