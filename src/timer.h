@@ -4,6 +4,7 @@
 #include <set>
 #include <functional> // std::function<>
 #include "channel.h" //不添加 timerfdChannel_ 报错
+#include "util.h" // Timestamp
 
 namespace miniduo {
 
@@ -11,7 +12,7 @@ class EventLoop;
 class Channel;
 class Timer;
 
-typedef int64_t Timestamp; // microseconds since the epoch
+// typedef int64_t Timestamp; // microseconds since the epoch
 // typedef std::pair<Timestamp, Timer*> TimerId;
 typedef std::weak_ptr<Timer> TimerId;
 typedef std::function<void()> TimerCallback;
@@ -28,7 +29,6 @@ public:
           expiration_(when),
           interval_(interval)
     {}
-
     void run() const { callback_(); }
     Timestamp expiration() const { return expiration_;}
     bool repeat() const { return interval_ > 0.0; }
@@ -54,8 +54,6 @@ class TimerQueue {
 public:
     TimerQueue(EventLoop* loop);
     ~TimerQueue();
-
-    
     /// Schedules the callback to be run at given time.
     /// repeats if arg interval > 0.0
     TimerId addTimer(const TimerCallback& cb,

@@ -1,6 +1,5 @@
 #include "channel.h"
 #include "EventLoop.h"
-// #include "log.h"
 #include "logging.h"
 
 #include <poll.h>

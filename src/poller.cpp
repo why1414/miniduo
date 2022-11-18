@@ -1,5 +1,4 @@
 #include "poller.h"
-#include "log.h"
 #include "logging.h"
 #include "channel.h"
 

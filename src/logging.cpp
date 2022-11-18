@@ -102,16 +102,18 @@ Logger& Logger::getLogger() {
 std::string Logger::strTime() {
     auto now = std::chrono::system_clock::now();
     time_t tt = std::chrono::system_clock::to_time_t(now);
-    struct tm* timeinfo = localtime(&tt);
+    struct tm timeinfo;
+    // struct tm* timeinfo = localtime(&tt); // not thread safe
+    localtime_r(&tt, &timeinfo); // thread safe
     
     char timeStr [100];
     snprintf(timeStr, sizeof(timeStr),"%04d-%02d-%02d %02d:%02d:%02d.%3d",
-             timeinfo->tm_year + 1900,
-             timeinfo->tm_mon + 1,
-             timeinfo->tm_mday,
-             timeinfo->tm_hour,
-             timeinfo->tm_min,
-             timeinfo->tm_sec,
+             timeinfo.tm_year + 1900,
+             timeinfo.tm_mon + 1,
+             timeinfo.tm_mday,
+             timeinfo.tm_hour,
+             timeinfo.tm_min,
+             timeinfo.tm_sec,
              (int)(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000));
     
     return std::string(timeStr);
