@@ -3,6 +3,7 @@
 #include "channel.h"
 #include "callbacks.h"
 #include "net.h"
+#include "buffer.h"
 
 #include <functional>
 #include <map>
@@ -32,7 +33,7 @@ public:
     void listen();
 
 private:
-    void handleRead();
+    void handleRead(Timestamp recvTime);
     EventLoop* loop_;
     const int acceptFd_;    // listening sockfd
     Channel acceptChannel_; // listening Channel;
@@ -106,20 +107,29 @@ public:
 
     void connectEstablished();
     void connectDestroyed();
+    // Thread safe
+    void shutdown();
+    // Thread safe
+    void send(const std::string& msg);
 
 private:
-    enum class StateE { kConnecting, kConnected, kDisconnected, };
+    enum class StateE { kConnecting, kConnected, kDisconnecting, kDisconnected, };
 
     void setState(StateE s) {
         state_ = s;
     }
-    void handleRead();
+    void shutdownInLoop();
+    void sendInLoop(const std::string& msg);
+    void handleRead(Timestamp recvTime);
     void handleWrite();
     void handleClose();
     void handleError();
+
     EventLoop* loop_;
     std::string name_;
     StateE state_;
+    Buffer input_;
+    Buffer output_;
     int sockFd_;
     std::unique_ptr<Channel> connChannel_;
     SockAddr localAddr_;

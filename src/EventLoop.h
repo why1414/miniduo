@@ -65,7 +65,7 @@ public:
 
 private:
     void abortNotInLoopThread();
-    void handleRead();
+    void handleRead(Timestamp recvTime);
     void doPendingTasks();
     
     typedef std::vector<Channel*> ChannelList;

@@ -17,7 +17,7 @@ extern void listenSock(int sockfd);
 extern int acceptSock(int sockfd, SockAddr* peerAddr);
 extern sockaddr_in getLocalAddr(int sockfd);
 extern sockaddr_in getPeerAddr(int sockfd);
-
+extern void shutdownWrite(int sockfd);
 } // namespace socket
 
 class SockAddr {

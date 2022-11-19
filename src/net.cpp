@@ -62,6 +62,11 @@ sockaddr_in getPeerAddr(int sockfd) {
     return peerAddr;
 }
 
+void shutdownWrite(int sockfd) {
+    int ret = shutdown(sockfd, SHUT_WR);
+    assert(ret >= 0);
+}
+
 } // namespace socket
 } // namespace miniduo
 

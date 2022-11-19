@@ -1,6 +1,7 @@
 #include "EventLoop.h"
 #include "callbacks.h"
 #include "conn.h"
+#include "buffer.h"
 
 #include <unistd.h>
 
@@ -19,11 +20,13 @@ void onConnection(const TcpConnectionPtr& conn) {
 }
 
 void onMsg(const TcpConnectionPtr& conn,
-           const char* data,
-           ssize_t len) 
+           Buffer* buf,
+           Timestamp recvTime) 
 {
-    printf("onMsg(): received %zd bytes from connection [%s]\n",
-           len, conn->name().c_str());
+    printf("onMsg(): received %zd bytes from connection [%s] at %s\n",
+           buf->readableBytes(), 
+           conn->name().c_str(),
+           util::timeString(recvTime).c_str());
 }
 
 int main() {

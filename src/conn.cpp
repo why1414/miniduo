@@ -19,7 +19,8 @@ Acceptor::Acceptor(EventLoop* loop, const SockAddr& listenAddr)
 {
     socket::setReuseAddr(acceptFd_);
     socket::bindAddr(acceptFd_, listenAddr);
-    acceptChannel_.setReadCallback(std::bind(&Acceptor::handleRead, this));
+    acceptChannel_.setReadCallback(
+        std::bind(&Acceptor::handleRead, this, std::placeholders::_1));
 }
 
 void Acceptor::listen() {
@@ -29,7 +30,7 @@ void Acceptor::listen() {
     acceptChannel_.enableReading();
 }
 
-void Acceptor::handleRead() {
+void Acceptor::handleRead(Timestamp recvTime) {
     loop_->assertInLoopThread();
     SockAddr peerAddr(0);
     /// FIXME: loop until no more new conn
@@ -116,7 +117,10 @@ TcpConnection::TcpConnection(EventLoop* loop,
 {
     log_debug("TcpConnection::ctor [%s] at %p fd=%d", name_.c_str(), this, sockfd);
     connChannel_->setReadCallback(
-        std::bind(&TcpConnection::handleRead, this)
+        std::bind(&TcpConnection::handleRead, this, std::placeholders::_1)
+    );
+    connChannel_->setWriteCallback(
+        std::bind(&TcpConnection::handleWrite, this)
     );
 
 }
@@ -136,23 +140,28 @@ void TcpConnection::connectEstablished() {
 
 void TcpConnection::connectDestroyed() {
     loop_->assertInLoopThread();
-    assert(state_ == StateE::kConnected);
+    assert(state_ == StateE::kConnected 
+            || state_ == StateE::kDisconnecting);
     setState(StateE::kDisconnected);
     connChannel_->disableAll();
     connectionCallback_(shared_from_this());
     loop_->removeChannel(connChannel_.get());
 }
 
-void TcpConnection::handleRead() {
-    char buf[65536];
-    ssize_t n = ::read(connChannel_->fd(), buf, sizeof(buf));
+void TcpConnection::handleRead(Timestamp recvTime) {
+    // char buf[65536];
+    // ssize_t n = ::read(connChannel_->fd(), buf, sizeof(buf));
+    int savedErrno;
+    ssize_t n = input_.readFd(connChannel_->fd(), &savedErrno);
     if(n > 0) {
-        msgCallback_(shared_from_this(), buf, n);
+        msgCallback_(shared_from_this(), &input_, recvTime);
     }
     else if(n==0) {
         handleClose();
     }
     else {
+        errno = savedErrno;
+        log_error("TcpConnection::handleRead");
         handleError();
     }
 }
@@ -160,7 +169,8 @@ void TcpConnection::handleRead() {
 void TcpConnection::handleClose() {
     loop_->assertInLoopThread();
     log_trace("TcpConnection::handleClose state = %d", state_);
-    assert(state_ == StateE::kConnected);
+    assert(state_ == StateE::kConnected 
+            || state_ == StateE::kDisconnecting);
     connChannel_->disableAll();
     closeCallback_(shared_from_this());
 }
@@ -170,6 +180,64 @@ void TcpConnection::handleError() {
 }
 
 void TcpConnection::handleWrite() {
+    loop_->assertInLoopThread();
+    if(connChannel_->isWriting()) {
+        ssize_t n = write(connChannel_->fd(),
+                          output_.beginRead(),
+                          output_.readableBytes());
+        if(n > 0) {
+            output_.retrieve(n);
+            if(output_.readableBytes() == 0) {
+                connChannel_->disableWriting();
+                if(state_ == StateE::kDisconnecting) {
+                    shutdownInLoop();
+                }
+            }
+            else {
+                log_trace("More data to write");
+            }
+        }
+        else {
+            log_error("TcpConnection::handleWrite");
+        }
+    }
+    else {
+        log_trace("Connection is down, no more writing");
+    }
+}
 
+void TcpConnection::shutdown() {
+    /// FIXME: make it thread safe for state_
+    if(state_ == StateE::kConnected) {
+        setState(StateE::kDisconnecting);
+        loop_->runInLoop(
+            std::bind(&TcpConnection::shutdownInLoop, this)
+        );
+    }
+}
+
+void TcpConnection::shutdownInLoop() {
+    loop_->assertInLoopThread();
+    if(!connChannel_->isWriting()) {
+        socket::shutdownWrite(connChannel_->fd());
+    }
+}
+
+void TcpConnection::send(const std::string& msg) {
+    if(state_ == StateE::kConnected) {
+        loop_->runInLoop(
+            std::bind(&TcpConnection::sendInLoop, this, msg)
+        );
+    }
+}
+/// @brief 在loop中发送msg，将msg放入output buffer中，
+/// 并激活监听 writable event
+/// @param msg 
+void TcpConnection::sendInLoop(const std::string& msg) {
+    loop_->assertInLoopThread();
+    output_.append(msg.data(), msg.size());
+    if(!connChannel_->isWriting()) {
+        connChannel_->enableWriting();
+    }
 }
 

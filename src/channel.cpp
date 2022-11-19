@@ -27,7 +27,7 @@ void Channel::update(){
 }
 
 // Channel::handleEvent() 根据revents_的值分别调用不同的用户回调
-void Channel::handleEvent(){
+void Channel::handleEvent(Timestamp recvTime){
     if(revents_ & POLLNVAL) {
         // log << "Channel::handleEvent() POLLNVAL";
         log_trace("Channel::handleEvent() POLLNVAL");
@@ -48,7 +48,7 @@ void Channel::handleEvent(){
 
     if(revents_ & (POLLIN | POLLPRI | POLLRDHUP)) {
         if(readCallback_) {
-            readCallback_();
+            readCallback_(recvTime);
         }
     }
 

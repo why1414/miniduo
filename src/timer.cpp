@@ -64,7 +64,7 @@ TimerQueue::TimerQueue(EventLoop* loop)
       timers_()
 {
     timerfdChannel_.setReadCallback(
-        std::bind(&TimerQueue::handleRead, this)
+        std::bind(&TimerQueue::handleRead, this, std::placeholders::_1)
     );
     // timerfdChannel_.enableReading();
     // loop_->runInLoop(std::bind(&Channel::enableReading, &this->timerfdChannel_));
@@ -125,7 +125,7 @@ void TimerQueue::cancelTimerInLoop(TimerId timerId) {
 }
 
 
-void TimerQueue::handleRead() {
+void TimerQueue::handleRead(Timestamp recvTime) {
     // handleRead will be called in EventLoop::loop()
     loop_->assertInLoopThread();
     log_trace("Handling timers...");

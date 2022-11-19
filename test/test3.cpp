@@ -3,18 +3,20 @@
 #include <unistd.h>
 #include "EventLoop.h"
 #include "channel.h"
+#include "util.h"
 
 
 miniduo::EventLoop *gLoop;
 
-void timeout()
+void timeout(miniduo::Timestamp recvTime)
 {
-    printf("Timeout! after 5 secs\n");
+    printf("[ %s ] Timeout! after 5 secs\n", miniduo::util::timeString(recvTime).c_str());
     gLoop->quit();
 }
 
 int main()
 {
+
     miniduo::EventLoop loop;
     gLoop = &loop;
     

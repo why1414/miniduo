@@ -21,10 +21,10 @@ Poller::~Poller()
 // Poller::poll() 调用 poll(2) 获得当前活动的IO事件
 // 然后填充 调用方传入的 activeChannels, 并返回 poll(2)
 // return 的时刻。
-time_t Poller::poll(int timeoutMs, ChannelList* activeChannels) {
+Timestamp Poller::poll(int timeoutMs, ChannelList* activeChannels) {
 
     int numEvents = ::poll(pollfds_.data(), pollfds_.size(), timeoutMs);
-    time_t now = time(0); // get current time;
+    Timestamp now = util::getTimeOfNow(); // get current time;
     if(numEvents > 0) {
         // log << numEvents << " events happended";
         log_trace("%d events happened", numEvents);

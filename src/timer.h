@@ -72,7 +72,7 @@ private:
     typedef std::set<TimerEntry> TimerList;
 
     // canlled when timerfd alarms
-    void handleRead();
+    void handleRead(Timestamp recvTime);
     // move out all expired timers
     std::vector<TimerEntry> getExpired(Timestamp now);
     /// @brief Add repeatable Timers in arg-expired back to timers_

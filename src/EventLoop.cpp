@@ -54,7 +54,7 @@ EventLoop::EventLoop()
     }
     
     wakeupChannel_->setReadCallback(
-        std::bind(&EventLoop::handleRead,this)
+        std::bind(&EventLoop::handleRead,this, std::placeholders::_1)
     );
     wakeupChannel_->enableReading();
     // runInLoop(std::bind(&Channel::enableReading, this->wakeupChannel_.get()));
@@ -97,12 +97,12 @@ void EventLoop::loop(){
     while(!stoplooping_) {
         doPendingTasks();
         activeChannels_.clear();
-        poller_->poll(kPollTimeMs, &activeChannels_);
+        Timestamp recvTime = poller_->poll(kPollTimeMs, &activeChannels_);
         for(ChannelList::iterator it = activeChannels_.begin();
             it != activeChannels_.end();
             ++it)
         {
-            (*it)->handleEvent();
+            (*it)->handleEvent(recvTime);
         }
         
     }
@@ -199,7 +199,7 @@ void EventLoop::wakeup() {
     
 } 
 
-void EventLoop::handleRead() {
+void EventLoop::handleRead(Timestamp recvTime) {
     uint64_t one = 1;
     ssize_t n = ::read(wakeupFd_, &one, sizeof one);
     if(n != sizeof one) {

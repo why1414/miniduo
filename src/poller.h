@@ -17,6 +17,7 @@ Poller 生命周期与 EventLoop 相等，Poller 不拥有 Channel
 #include <functional> // std::bind()
 
 #include "EventLoop.h"
+#include "util.h" // Timestamp
 
 struct pollfd; // 避免 include<poll.h>
 
@@ -36,7 +37,7 @@ public:
     ~Poller();
 
     // Polls the I/O events, called in the loop thread, return current Timepoint.
-    time_t poll(int timeoutMs, ChannelList* activeChannels);
+    Timestamp poll(int timeoutMs, ChannelList* activeChannels);
 
     /// Thread safe
     void updateChannel(Channel* channel) {
