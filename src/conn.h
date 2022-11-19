@@ -34,7 +34,7 @@ public:
 private:
     void handleRead();
     EventLoop* loop_;
-    const int acceptFd_; // listening sockfd
+    const int acceptFd_;    // listening sockfd
     Channel acceptChannel_; // listening Channel;
     NewConnectionCallback newConnectionCallback_;
     bool listening_;

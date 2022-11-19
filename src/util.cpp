@@ -37,7 +37,7 @@ std::string timeString(Timestamp now) {
     struct tm timeinfo;
     localtime_r(&tt, &timeinfo);
     char timeStr[100];
-    snprintf(timeStr, sizeof(timeStr),"%04d-%02d-%02d %02d:%02d:%02d.%3d",
+    snprintf(timeStr, sizeof(timeStr),"%04d-%02d-%02d %02d:%02d:%02d.%3ld",
              timeinfo.tm_year + 1900,
              timeinfo.tm_mon + 1,
              timeinfo.tm_mday,

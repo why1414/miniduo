@@ -14,6 +14,7 @@ Poller 生命周期与 EventLoop 相等，Poller 不拥有 Channel
 #pragma once
 #include <vector>
 #include <map>
+#include <functional> // std::bind()
 
 #include "EventLoop.h"
 
@@ -37,9 +38,18 @@ public:
     // Polls the I/O events, called in the loop thread, return current Timepoint.
     time_t poll(int timeoutMs, ChannelList* activeChannels);
 
-    // Changes the interested I/O events, called in the loop thread.
-    void updateChannel(Channel* channel);
-    void removeChannel(Channel* channel);
+    /// Thread safe
+    void updateChannel(Channel* channel) {
+        ownerLoop_->runInLoop(
+            std::bind(&Poller::updateChannelInLooping, this, channel)
+        );
+    }
+    /// Thread safe
+    void removeChannel(Channel* channel) {
+        ownerLoop_->runInLoop(
+            std::bind(&Poller::removeChannelInLooping, this, channel)
+        );
+    };
 
     void assertInLoopThread() { ownerLoop_->assertInLoopThread(); }
 
@@ -48,7 +58,9 @@ public:
 private:
     void fillActiveChannels(int numEvents,
                             ChannelList* activeChannels) const;
-    
+    void updateChannelInLooping(Channel* channel);
+    void removeChannelInLooping(Channel* channel);
+
     typedef std::vector<struct pollfd> PollFdList;
     typedef std::map<int, Channel*> ChannelMap;  // fd -> channel*
 

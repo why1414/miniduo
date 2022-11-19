@@ -30,11 +30,15 @@ public:
 
     void loop();
     void quit();
+    // thread safe
     void updateChannel(Channel* channel);
+    // thread safe
     void removeChannel(Channel* channel);
+    // Thread safe (RunInLoop)
     TimerId runAt(const Timestamp time, const TimerCallback &cb);
     TimerId runAfter(double delay, const TimerCallback &cb);
     TimerId runEvery(double interval, const TimerCallback &cb);
+    // Thread safe (RunInLoop)
     void cancel(TimerId timerId);
 
     void runInLoop(const Task& cb);
@@ -50,6 +54,12 @@ public:
     /// @brief 判断当前 线程是否有 已经有loop注册，若有检查是不是自己注册的；
     /// 如果没有，就在当前线程注册自己 
     bool isInLoopThread() ;
+    pid_t gettid() const {
+        return tid_;
+    }
+    void settid(pid_t tid) {
+        tid_ = tid;
+    }
 
     static EventLoop* getEventLoopOfCurrentThread();
 
@@ -70,6 +80,7 @@ private:
     std::mutex mutex_;
     std::vector<Task> pendingTasks_; // Guarded by mutex_
 
+    pid_t tid_; // looping thread tid
     
 };
 

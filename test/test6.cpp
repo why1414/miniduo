@@ -23,7 +23,7 @@ int main() {
                        g_loop = &tloop;
                       
                        tloop.loop();});
-    sleep(15);
+    sleep(5);
     g_loop->runInLoop(threadFunc);
     g_loop->runEvery(3, threadFunc);
     

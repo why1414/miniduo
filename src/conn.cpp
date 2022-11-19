@@ -23,7 +23,7 @@ Acceptor::Acceptor(EventLoop* loop, const SockAddr& listenAddr)
 }
 
 void Acceptor::listen() {
-    loop_->assertInLoopThread();
+    // loop_->assertInLoopThread();
     listening_ = true;
     socket::listenSock(acceptFd_);
     acceptChannel_.enableReading();

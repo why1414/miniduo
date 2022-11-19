@@ -67,9 +67,9 @@ void Poller::fillActiveChannels(int numEvents,
     }
 }
 
-// Poller::updateChannel() 负责维护和更新pollfds_数组。
-// 添加 Channel 的复杂度 O(logN), 更新已有Channel是 O(1)
-void Poller::updateChannel(Channel* channel) {
+/// 负责维护和更新pollfds_数组。
+/// 添加 Channel 的复杂度 O(logN), 更新已有Channel是 O(1)
+void Poller::updateChannelInLooping(Channel* channel) {
     assertInLoopThread();
     // log << "fd = " << channel->fd() << " events = " << channel->events();
     log_trace("Poller update: fd = %d, intrested events = %d", channel->fd(), channel->events());
@@ -102,10 +102,10 @@ void Poller::updateChannel(Channel* channel) {
             pfd.fd = -channel->fd()-1;
         }
 
-    }
+    }    
 }
 
-void Poller::removeChannel(Channel* channel) {
+void Poller::removeChannelInLooping(Channel* channel) {
     ownerLoop_->assertInLoopThread();
     log_trace("fd = %d", channel->fd());
     assert(channels_.find(channel->fd()) != channels_.end());

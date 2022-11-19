@@ -67,7 +67,7 @@ TimerQueue::TimerQueue(EventLoop* loop)
         std::bind(&TimerQueue::handleRead, this)
     );
     // timerfdChannel_.enableReading();
-    loop_->runInLoop(std::bind(&Channel::enableReading, &this->timerfdChannel_));
+    // loop_->runInLoop(std::bind(&Channel::enableReading, &this->timerfdChannel_));
 }
 
 TimerQueue::~TimerQueue() {
@@ -84,7 +84,7 @@ TimerId TimerQueue::addTimer(const TimerCallback& cb,
                              double interval)
 {
     // Timer* timer = new Timer(cb, when, interval);
-    log_trace("Enter addTimer");
+    log_trace("Enter addTimer()");
     auto timer = std::make_shared<Timer>(cb, when, interval);
     TimerId id = timer;
     loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, std::move(timer)));
@@ -118,6 +118,7 @@ void TimerQueue::cancelTimerInLoop(TimerId timerId) {
         }
         else {
             /// FIXME: 当在 queueInLoop 不需要此，当在handle timers 中调用cancelTimer()
+            /// expired 中 timer 的interval被置0.0 但本次还是会执行，后续在 reset中 timer 被删除
             timer->setUnrepeat();
         }
     }
