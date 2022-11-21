@@ -6,7 +6,8 @@
 #include <memory> // std::unique_ptr<T>
 #include <atomic> // std::atomic<T>
 #include <mutex>
-
+#include <signal.h> // signal()
+ 
 #include "timer.h"
 #include "util.h"
 
@@ -83,6 +84,8 @@ private:
     pid_t tid_; // looping thread tid
     
 };
+
+
 
 
 

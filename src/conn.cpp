@@ -97,8 +97,8 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
     size_t n = connections_.erase(conn->name());
     assert( n == 1);
-    conn->getLoop()->runInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
-
+    // queueInLoop: 确保 TcpConn 不会在 IO 处理中析构
+    conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
 }
 
 
@@ -172,6 +172,7 @@ void TcpConnection::handleClose() {
     assert(state_ == StateE::kConnected 
             || state_ == StateE::kDisconnecting);
     connChannel_->disableAll();
+    // loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
     closeCallback_(shared_from_this());
 }
 
@@ -181,27 +182,34 @@ void TcpConnection::handleError() {
 
 void TcpConnection::handleWrite() {
     loop_->assertInLoopThread();
-    if(connChannel_->isWriting()) {
+    if(connChannel_->isWriting()) 
+    {
         ssize_t n = write(connChannel_->fd(),
                           output_.beginRead(),
                           output_.readableBytes());
-        if(n > 0) {
+        if(n > 0) 
+        {
             output_.retrieve(n);
-            if(output_.readableBytes() == 0) {
+            if(output_.readableBytes() == 0) 
+            {
                 connChannel_->disableWriting();
-                if(state_ == StateE::kDisconnecting) {
+                if(state_ == StateE::kDisconnecting) 
+                {
                     shutdownInLoop();
                 }
             }
-            else {
+            else 
+            {
                 log_trace("More data to write");
             }
         }
-        else {
+        else 
+        {
             log_error("TcpConnection::handleWrite");
         }
     }
-    else {
+    else 
+    {
         log_trace("Connection is down, no more writing");
     }
 }

@@ -13,6 +13,15 @@
 namespace  miniduo
 {
 
+class IgnoreSigPipe {
+public:
+    IgnoreSigPipe() {
+        ::signal(SIGPIPE, SIG_IGN);
+    }
+};
+// 全局变量，初始化以忽略 SIGPIPE 信号，防止网络服务器socket异常读写退出
+IgnoreSigPipe ignPipe; 
+
 __thread EventLoop* t_loopInThisThread = nullptr;
 
 // extern Timestamp getTimeOfNow();
