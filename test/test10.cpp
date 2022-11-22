@@ -16,7 +16,10 @@ void onConnection(const TcpConnectionPtr& conn)
     printf("onConnection(): new connection [%s] from %s\n",
            conn->name().c_str(),
            conn->peerAddress().addrString().c_str());
-    sleep(5);
+    // sleep(5);
+    char buf[50];
+    snprintf(buf, 50, "I am thread: %d\n", util::currentTid());
+    conn->send(buf);
     conn->send(message1);
     conn->send(message2);
     // conn->shutdown();
@@ -59,7 +62,7 @@ int main(int argc, char* argv[])
   std::fill(message2.begin(), message2.end(), 'B');
 
   SockAddr listenAddr(9981);
-  EventLoop loop;
+  EventLoops loop(4);
 
   TcpServer server(&loop, listenAddr);
   server.setConnectionCallback(onConnection);

@@ -62,7 +62,7 @@ public:
 private:
     void newConnection(int sockfd, const SockAddr& peerAddr);
     void removeConnection(const TcpConnectionPtr& conn);
-
+    void removeConnectionInLoop(const TcpConnectionPtr& conn);
     typedef std::map<std::string, TcpConnectionPtr> ConnectionMap;
 
     EventLoop* loop_;   // The acceptor loop;

@@ -213,5 +213,52 @@ void EventLoop::handleRead(Timestamp recvTime) {
 
 }
 
+EventLoop* EventLoop::allocLoop() {
+    return this;
+}
+
+EventLoops::EventLoops(int loopNum)
+    : subLoopNum_(loopNum),
+      stopLooping_(true),
+      next_(0),
+      threads_(loopNum),
+      subLoops_(loopNum)   
+{
+    log_trace("dfakflkas");
+}
+
+EventLoops::~EventLoops() {
+    for(auto &t: threads_) {
+        if(t.joinable())
+            t.join();
+    }
+}
+
+EventLoop* EventLoops::allocLoop() {
+    if(subLoopNum_ == 0) {
+        return this;
+    }
+    EventLoop* loop = &subLoops_[next_];
+    next_ = (next_ + 1) % subLoopNum_;
+    return loop;
+}
+
+void EventLoops::loop() {
+    for(int i=0; i<subLoopNum_; i++) {
+        std::thread t(
+            std::bind(&EventLoop::loop, &subLoops_[i])
+        );
+        threads_[i].swap(t);
+    }
+    EventLoop::loop();
+}
+
+void EventLoops::quit() {
+    for(auto &loop: subLoops_){
+        loop.quit();
+    }
+    EventLoop::quit();    
+}
+
 
 

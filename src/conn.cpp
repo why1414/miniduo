@@ -81,24 +81,30 @@ void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
     log_info("TcpServer::newConnection [%s] - new connection [%s] from %s", 
             name_.c_str(), connName.c_str(), peerAddr.addrString().c_str());
     SockAddr localAddr(socket::getLocalAddr(sockfd));
-    TcpConnectionPtr conn( new TcpConnection(loop_, connName, sockfd, localAddr, peerAddr));
+    EventLoop* ioLoop = loop_->allocLoop();
+    TcpConnectionPtr conn( new TcpConnection(ioLoop, connName, sockfd, localAddr, peerAddr));
     connections_[connName] = conn;
     conn->setConnectionCallback(connectionCallback_);
     conn->setMsgCallback(msgCallback_);
     conn->setCloseCallback(
         std::bind(&TcpServer::removeConnection, this, std::placeholders::_1)
     );
-    conn->connectEstablished();
+    ioLoop->runInLoop([conn] {conn->connectEstablished();});
+    // conn->connectEstablished();
 
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
+    loop_->runInLoop([this, conn] {removeConnectionInLoop(conn);});
+}
+
+void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn) {
     loop_->assertInLoopThread();
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
     size_t n = connections_.erase(conn->name());
     assert( n == 1);
     // queueInLoop: 确保 TcpConn 不会在 IO 处理中析构
-    conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
+    conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));   
 }
 
 

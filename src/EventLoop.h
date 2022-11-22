@@ -7,6 +7,7 @@
 #include <atomic> // std::atomic<T>
 #include <mutex>
 #include <signal.h> // signal()
+#include <thread>
  
 #include "timer.h"
 #include "util.h"
@@ -46,6 +47,7 @@ public:
     void queueInLoop(const Task& cb);
     void wakeup();
     
+    virtual EventLoop* allocLoop();
 
     void assertInLoopThread(){
         if(!isInLoopThread()){
@@ -56,7 +58,6 @@ public:
     /// @brief 判断当前 EventLoop 是否已开始 looping，
     /// 并且looping线程是否与当前调用该函数的线程是同一个
     bool isInLoopThread() ;
-    
     static EventLoop* getEventLoopOfCurrentThread();
 
 private:
@@ -82,6 +83,23 @@ private:
 
     pid_t tid_; // looping thread tid
     
+};
+
+class EventLoops: public EventLoop {
+public:
+    EventLoops(int loopNum = 0);
+    ~EventLoops();
+    void loop();
+    void quit(); // FIXME: override or not?
+    virtual EventLoop* allocLoop() override;
+
+private:
+    std::vector<std::thread> threads_;
+    std::vector<EventLoop> subLoops_;
+    std::atomic<bool> stopLooping_;
+    const int subLoopNum_; // sub loop 的数量
+    int next_;
+
 };
 
 
