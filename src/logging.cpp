@@ -89,6 +89,7 @@ void Logger::logv(const LogLevel level,
     cv_.notify_one();
 }
 
+/// TODO: 
 void Logger::maybeRotate() {
 
 }

@@ -52,22 +52,21 @@ public:
             abortNotInLoopThread();
         }
     }
-    /// @brief 判断当前 线程是否有 已经有loop注册，若有检查是不是自己注册的；
-    /// 如果没有，就在当前线程注册自己 
+    
+    /// @brief 判断当前 EventLoop 是否已开始 looping，
+    /// 并且looping线程是否与当前调用该函数的线程是同一个
     bool isInLoopThread() ;
-    pid_t gettid() const {
-        return tid_;
-    }
-    void settid(pid_t tid) {
-        tid_ = tid;
-    }
-
+    
     static EventLoop* getEventLoopOfCurrentThread();
 
 private:
     void abortNotInLoopThread();
     void handleRead(Timestamp recvTime);
     void doPendingTasks();
+
+    void settid(pid_t tid) {
+        tid_ = tid;
+    }
     
     typedef std::vector<Channel*> ChannelList;
     

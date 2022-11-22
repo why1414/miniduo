@@ -41,31 +41,31 @@ public:
 
     /// Thread safe
     void updateChannel(Channel* channel) {
-        ownerLoop_->runInLoop(
-            std::bind(&Poller::updateChannelInLooping, this, channel)
+        loop_->runInLoop(
+            std::bind(&Poller::updateChannelInLoop, this, channel)
         );
     }
     /// Thread safe
     void removeChannel(Channel* channel) {
-        ownerLoop_->runInLoop(
-            std::bind(&Poller::removeChannelInLooping, this, channel)
+        loop_->runInLoop(
+            std::bind(&Poller::removeChannelInLoop, this, channel)
         );
     };
 
-    void assertInLoopThread() { ownerLoop_->assertInLoopThread(); }
+    void assertInLoopThread() { loop_->assertInLoopThread(); }
 
 
 
 private:
     void fillActiveChannels(int numEvents,
                             ChannelList* activeChannels) const;
-    void updateChannelInLooping(Channel* channel);
-    void removeChannelInLooping(Channel* channel);
+    void updateChannelInLoop(Channel* channel);
+    void removeChannelInLoop(Channel* channel);
 
     typedef std::vector<struct pollfd> PollFdList;
     typedef std::map<int, Channel*> ChannelMap;  // fd -> channel*
 
-    EventLoop* ownerLoop_;
+    EventLoop* loop_;
     PollFdList pollfds_;   // 缓存 pollfd 数组
     ChannelMap channels_;
 

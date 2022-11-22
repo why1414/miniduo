@@ -83,12 +83,8 @@ EventLoop* EventLoop::getEventLoopOfCurrentThread(){
     return t_loopInThisThread;
 }
 
-bool EventLoop::isInLoopThread() {
-    // if(t_loopInThisThread == nullptr) {
-    //     t_loopInThisThread = this;
-    // }
-    // return t_loopInThisThread == this;
 
+bool EventLoop::isInLoopThread() {
     if(!stoplooping_) {
         return tid_ == util::currentTid();
     }
