@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
   std::fill(message2.begin(), message2.end(), 'B');
 
   SockAddr listenAddr(9981);
-  EventLoops loop(4);
+  EventLoops loop;
 
   TcpServer server(&loop, listenAddr);
   server.setConnectionCallback(onConnection);

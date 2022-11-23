@@ -218,39 +218,39 @@ EventLoop* EventLoop::allocLoop() {
 }
 
 EventLoops::EventLoops(int loopNum)
-    : subLoopNum_(loopNum),
-      stopLooping_(true),
+    : size_(loopNum),
       next_(0),
-      threads_(loopNum),
       subLoops_(loopNum)   
 {
-    log_trace("dfakflkas");
+
 }
 
 EventLoops::~EventLoops() {
-    for(auto &t: threads_) {
-        if(t.joinable())
-            t.join();
-    }
+
 }
 
 EventLoop* EventLoops::allocLoop() {
-    if(subLoopNum_ == 0) {
+    if(size_ == 0) {
         return this;
     }
     EventLoop* loop = &subLoops_[next_];
-    next_ = (next_ + 1) % subLoopNum_;
+    next_ = (next_ + 1) % size_;
     return loop;
 }
 
+/// @brief  创建线程依次启动loops 以及loops全部结束回收线程
 void EventLoops::loop() {
-    for(int i=0; i<subLoopNum_; i++) {
+    std::thread threads[size_];
+    for(int i=0; i<size_; i++) {
         std::thread t(
             std::bind(&EventLoop::loop, &subLoops_[i])
         );
-        threads_[i].swap(t);
+        threads[i].swap(t);
     }
     EventLoop::loop();
+    for(auto &t: threads) {
+        t.join();
+    }
 }
 
 void EventLoops::quit() {

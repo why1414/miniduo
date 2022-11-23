@@ -86,6 +86,7 @@ private:
 };
 
 class EventLoops: public EventLoop {
+    
 public:
     EventLoops(int loopNum = 0);
     ~EventLoops();
@@ -94,11 +95,9 @@ public:
     virtual EventLoop* allocLoop() override;
 
 private:
-    std::vector<std::thread> threads_;
     std::vector<EventLoop> subLoops_;
-    std::atomic<bool> stopLooping_;
-    const int subLoopNum_; // sub loop 的数量
-    int next_;
+    const int size_; // sub loop 的数量
+    std::atomic<int> next_;
 
 };
 

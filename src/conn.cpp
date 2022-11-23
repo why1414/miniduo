@@ -103,7 +103,7 @@ void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn) {
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
     size_t n = connections_.erase(conn->name());
     assert( n == 1);
-    // queueInLoop: 确保 TcpConn 不会在 IO 处理中析构
+    // queueInLoop: 确保 TcpConn 不会在 IO 处理中handleclose析构
     conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));   
 }
 
