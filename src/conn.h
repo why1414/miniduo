@@ -59,6 +59,9 @@ public:
     void setMsgCallback(const MsgCallback& cb) {
         msgCallback_ = cb;
     }
+    void setWriteCompleteCallback(const WriteCompleteCallback& cb) {
+        writeCompleteCallback_ = cb;
+    }
 
 private:
     void newConnection(int sockfd, const SockAddr& peerAddr);
@@ -71,6 +74,7 @@ private:
     std::unique_ptr<Acceptor> acceptor_;
     ConnectionCallback connectionCallback_;
     MsgCallback msgCallback_;
+    WriteCompleteCallback writeCompleteCallback_;
     bool started_;
     int nextConnId_;
     ConnectionMap connections_;
@@ -109,6 +113,9 @@ public:
     void setCloseCallback(const CloseCallback& cb) {
         closeCallback_ = cb;
     }
+    void setWriteCompleteCallback(const WriteCompleteCallback& cb) {
+        writeCompleteCallback_ = cb;
+    }
 
     void connectEstablished();
     void connectDestroyed();
@@ -143,6 +150,7 @@ private:
     ConnectionCallback connectionCallback_;
     MsgCallback msgCallback_;
     CloseCallback closeCallback_;
+    WriteCompleteCallback writeCompleteCallback_;
 
 
 }; // class TcpConnection

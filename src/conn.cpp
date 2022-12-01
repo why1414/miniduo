@@ -87,8 +87,8 @@ void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
     conn->setConnectionCallback(connectionCallback_);
     conn->setMsgCallback(msgCallback_);
     conn->setCloseCallback(
-        std::bind(&TcpServer::removeConnection, this, std::placeholders::_1)
-    );
+        std::bind(&TcpServer::removeConnection, this, std::placeholders::_1));
+    conn->setWriteCompleteCallback(writeCompleteCallback_);
     ioLoop->runInLoop([conn] {conn->connectEstablished();});
     // conn->connectEstablished();
 
@@ -128,6 +128,7 @@ TcpConnection::TcpConnection(EventLoop* loop,
     connChannel_->setWriteCallback(
         std::bind(&TcpConnection::handleWrite, this)
     );
+
 
 }
 
@@ -200,6 +201,11 @@ void TcpConnection::handleWrite() {
             if(output_.readableBytes() == 0) 
             {
                 connChannel_->disableWriting();
+                if(writeCompleteCallback_) {
+                    loop_->queueInLoop(
+                        std::bind(writeCompleteCallback_, shared_from_this())
+                    );
+                }
                 if(state_ == StateE::kDisconnecting) 
                 {
                     shutdownInLoop();
