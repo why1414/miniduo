@@ -15,11 +15,11 @@ TEST_OBJS := $(TEST_OBJS:test/%=objs/test/%)
 # 定义objs下的o文件，依赖src下对应的cpp文件
 objs/src/%.o : src/%.cpp
 	@mkdir -p $(dir $@)
-	g++ -c $< -o $@
+	g++ -c -g $< -o $@
 
 objs/test/%.o : test/%.cpp
 	@mkdir -p $(dir $@)
-	g++ -c -I ./src $< -o $@
+	g++ -c -g -I ./src $< -o $@
 
 
 all :  $(TEST_BINS)

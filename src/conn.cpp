@@ -178,7 +178,8 @@ void TcpConnection::handleClose() {
     assert(state_ == StateE::kConnected 
             || state_ == StateE::kDisconnecting);
     connChannel_->disableAll();
-    // loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
+    loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
+    // TcpServer::removeConnection
     closeCallback_(shared_from_this());
 }
 
@@ -238,12 +239,17 @@ void TcpConnection::shutdownInLoop() {
 }
 
 void TcpConnection::send(const std::string& msg) {
+    if(msg.empty()) {
+        return ;
+    }
     if(state_ == StateE::kConnected) {
         loop_->runInLoop(
             std::bind(&TcpConnection::sendInLoop, this, msg)
         );
     }
 }
+
+
 /// @brief 在loop中发送msg，将msg放入output buffer中，
 /// 并激活监听 writable event
 /// @param msg 

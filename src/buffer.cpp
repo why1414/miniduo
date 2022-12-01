@@ -4,6 +4,7 @@
 
 using namespace miniduo;
 
+const char Buffer::kCRLF[] = "\r\n";
 // begin member functions of class Buffer;
 Buffer::Buffer()
     : buffer_(kCheapPrepend + kInitialSize),
@@ -40,11 +41,17 @@ const char* Buffer::beginRead() const {
 void Buffer::retrieve(size_t len) {
     assert(readableBytes() >= len);
     readerIndex_ += len;
+    if(readerIndex_ == writerIndex_) {
+        retrieveAll();
+    }
 }
 
 void Buffer::retrieveUntil(const char* end) {
     assert(end >= beginRead() && end <= beginWrite());
     readerIndex_ += (end - beginRead());
+    if(readerIndex_ == writerIndex_) {
+        retrieveAll();
+    }
 }
 
 void Buffer::retrieveAll() {

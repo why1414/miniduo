@@ -41,7 +41,7 @@ Logger::~Logger() {
 void Logger::process() {
     while(!stopLogging_) {
         // 检查fd_
-        maybeRotate();
+        tryRotate();
 
         std::unique_lock<std::mutex> lock(mut_);
 
@@ -90,7 +90,7 @@ void Logger::logv(const LogLevel level,
 }
 
 /// TODO: 
-void Logger::maybeRotate() {
+void Logger::tryRotate() {
 
 }
 

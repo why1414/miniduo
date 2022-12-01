@@ -18,6 +18,13 @@ extern int acceptSock(int sockfd, SockAddr* peerAddr);
 extern sockaddr_in getLocalAddr(int sockfd);
 extern sockaddr_in getPeerAddr(int sockfd);
 extern void shutdownWrite(int sockfd);
+extern void close(int sockfd);
+extern int connect(int sockfd, sockaddr_in serverAddr);
+extern int getSocketError(int sockfd);
+extern bool isSelfConnect(int sockfd);
+
+
+
 } // namespace socket
 
 class SockAddr {

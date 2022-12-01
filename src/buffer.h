@@ -13,6 +13,7 @@ class Buffer {
 public:
     static const size_t kCheapPrepend = 8;
     static const size_t kInitialSize = 1024;
+    static const char kCRLF[];
 
     Buffer();
 
@@ -46,6 +47,17 @@ public:
     void makeSpace(size_t len);
 
     void hasWritten(size_t len);
+
+    const char* findCRLF() const {
+        const char* crlf = std::search(begin(), beginWrite(), kCRLF, kCRLF+2);
+        return crlf == beginWrite() ? nullptr : crlf;
+    };
+    const char* findCRLF(const char* start) const {
+        assert(beginRead() <= start);
+        assert(start <= beginWrite());
+        const char* crlf = std::search(start, beginWrite(), kCRLF, kCRLF+2);
+        return crlf == beginWrite() ? nullptr : crlf;
+    };
 
 private:
     // begin ptr of buffer_

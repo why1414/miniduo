@@ -4,6 +4,7 @@
 #include "callbacks.h"
 #include "net.h"
 #include "buffer.h"
+#include "util.h" // Autotext
 
 #include <functional>
 #include <map>
@@ -93,6 +94,10 @@ public:
     const std::string& name() const {return name_;}
     const SockAddr& localAddress() const {return localAddr_;}
     const SockAddr& peerAddress() const {return peerAddr_;}
+    template <class T>
+    T& getContext() {
+        return context_.getContext<T>();
+    }
     bool connected() const {return state_ == StateE::kConnected;}
 
     void setConnectionCallback(const ConnectionCallback& cb) {
@@ -130,6 +135,7 @@ private:
     StateE state_;
     Buffer input_;
     Buffer output_;
+    util::AutoContext context_;
     int sockFd_;
     std::unique_ptr<Channel> connChannel_;
     SockAddr localAddr_;

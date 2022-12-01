@@ -6,6 +6,7 @@
 #include <sys/types.h>    // socket(2)
 #include <sys/socket.h>    // socket(2)
 #include <cassert>
+#include <unistd.h> // close()
 
 
 namespace miniduo {
@@ -65,6 +66,35 @@ sockaddr_in getPeerAddr(int sockfd) {
 void shutdownWrite(int sockfd) {
     int ret = shutdown(sockfd, SHUT_WR);
     assert(ret >= 0);
+}
+
+void close(int sockfd) {
+    int ret = ::close(sockfd);
+    assert(ret >= 0);
+}
+
+int connect(int sockfd, sockaddr_in serverAddr) {
+    socklen_t len = sizeof(serverAddr);
+    int ret = ::connect(sockfd, (struct sockaddr*) &serverAddr, len);
+    return ret;
+}
+
+int getSocketError(int sockfd) {
+    int optval;
+    socklen_t optlen = sizeof(optval);
+    if(::getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &optval, &optlen) < 0) {
+        return errno;
+    }
+    else {
+        return optval;
+    }
+}
+
+bool isSelfConnect(int sockfd) {
+    struct sockaddr_in localaddr = getLocalAddr(sockfd);
+    struct sockaddr_in peeraddr = getPeerAddr(sockfd);
+    return localaddr.sin_port == peeraddr.sin_port
+        && localaddr.sin_addr.s_addr == peeraddr.sin_addr.s_addr;
 }
 
 } // namespace socket

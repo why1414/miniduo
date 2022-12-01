@@ -128,7 +128,6 @@ void Poller::removeChannelInLoop(Channel* channel) {
         channels_[endFd]->setIndex(idx);
         pollfds_.pop_back();
     }
-
 }
 
 

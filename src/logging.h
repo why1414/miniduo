@@ -1,4 +1,4 @@
-#pragma
+#pragma once
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -7,7 +7,7 @@
 
 #define log(level, levelstr, format, args...)    \
     do {                   \
-        Logger::getLogger().logv(level,  levelstr "[%s][%d]: " format, __FILE__, __LINE__, ##args); \
+        Logger::getLogger().logv(level,  levelstr "[%s:%d][%s]: " format, __FILE__, __LINE__, __FUNCTION__, ##args); \
     } while(0) 
 
 
@@ -32,6 +32,15 @@
 #define set_logName(n)  Logger::getLogger().setFileBaseName(n)
 #define set_logInterval(i) Logger::getLogger().setRotateInterval(i)
 
+static std::string _CutParenthesesNTail(std::string&& prettyFunction) {
+    auto pos = prettyFunction.find('(');
+    if(pos != std::string::npos) {
+        prettyFunction.erase(prettyFunction.begin()+pos, prettyFunction.end());
+    }
+    return std::move(prettyFunction);
+}
+
+#define __STR_FUNCTION__ _CutParenthesesNTail(std::string(__PRETTY_FUNCTION__)).c_str()
 
 
 class Logger {
@@ -59,8 +68,8 @@ private:
            std::string fileBaseName,
            long rotateInterval);
     
-    // 检查是否切换log文件，只在后台线程中被调用
-    void maybeRotate(); 
+    // 尝试切换log文件，只在后台线程中被调用
+    void tryRotate(); 
     
     // 后台线程执行，把 消息队列flush
 
