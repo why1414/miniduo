@@ -74,7 +74,7 @@ void TcpServer::start() {
 
 void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
     loop_->assertInLoopThread();
-    char buf[32];
+    char buf[32] = {0};
     snprintf(buf, sizeof(buf), "#%d", nextConnId_);
     ++nextConnId_;
     std::string connName = name_ + buf;
@@ -101,8 +101,12 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
 void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn) {
     loop_->assertInLoopThread();
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
+    // assert( connections_.find(conn->name()) != connections_.end() );
+    if(connections_.find(conn->name()) == connections_.end()) {
+        log_debug("conn:%s has been removed", conn->name().c_str());
+        return;
+    }
     size_t n = connections_.erase(conn->name());
-    assert( n == 1);
     // queueInLoop: 确保 TcpConn 不会在 IO 处理中handleclose析构
     conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));   
 }
@@ -245,9 +249,7 @@ void TcpConnection::shutdownInLoop() {
 }
 
 void TcpConnection::send(const std::string& msg) {
-    if(msg.empty()) {
-        return ;
-    }
+    assert(msg.size() > 0);
     if(state_ == StateE::kConnected) {
         loop_->runInLoop(
             std::bind(&TcpConnection::sendInLoop, this, msg)
