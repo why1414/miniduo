@@ -32,9 +32,9 @@ public:
 
     void loop();
     void quit();
-    // thread safe
+    // thread safe (RunInLoop)
     void updateChannel(Channel* channel);
-    // thread safe
+    // thread safe (RunInLoop)
     void removeChannel(Channel* channel);
     // Thread safe (RunInLoop)
     TimerId runAt(const Timestamp time, const TimerCallback &cb);
@@ -49,7 +49,7 @@ public:
     
     virtual EventLoop* allocLoop();
 
-    void assertInLoopThread(){
+    void assertInLoopThread() {
         if(!isInLoopThread()){
             abortNotInLoopThread();
         }
@@ -58,7 +58,6 @@ public:
     /// @brief 判断当前 EventLoop 是否已开始 looping，
     /// 并且looping线程是否与当前调用该函数的线程是同一个
     bool isInLoopThread() ;
-    static EventLoop* getEventLoopOfCurrentThread();
 
 private:
     void abortNotInLoopThread();

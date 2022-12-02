@@ -22,7 +22,6 @@ public:
 // 全局变量，初始化以忽略 SIGPIPE 信号，防止网络服务器socket异常读写退出
 IgnoreSigPipe ignPipe; 
 
-__thread EventLoop* t_loopInThisThread = nullptr;
 
 // extern Timestamp getTimeOfNow();
 const int kPollTimeMs = 10000;
@@ -33,8 +32,12 @@ int createEventfd() {
         log_fatal("Failed in eventfd");
         abort(); // stdlib.h
     }
-   
     return evtfd;
+}
+
+void closeEventfd(int fd) {
+    if(fd < 0) return ;
+    ::close(fd);
 }
 
 } // namespace  miniduo
@@ -57,13 +60,9 @@ EventLoop::EventLoop()
     // 检查当前 thread 是否已存在 EventLoop
     // log trace EventLoop created
     log_trace("EventLoop created %p in thread %d", this, util::currentTid());
-    if (t_loopInThisThread != nullptr){
-        // log fatal another EventLoop exists in this thread
-        log_trace("Another EventLoop %p exists in this thread %d", t_loopInThisThread, util::currentTid());
-    }
     
     wakeupChannel_->setReadCallback(
-        std::bind(&EventLoop::handleRead,this, std::placeholders::_1)
+        std::bind(&EventLoop::handleRead, this, std::placeholders::_1)
     );
     wakeupChannel_->enableReading();
     // runInLoop(std::bind(&Channel::enableReading, this->wakeupChannel_.get()));
@@ -73,15 +72,9 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop(){
     assert(stoplooping_);
-    if(isInLoopThread()) {
-        t_loopInThisThread = nullptr;
-    }
-    
+    closeEventfd(wakeupFd_);
 }
 
-EventLoop* EventLoop::getEventLoopOfCurrentThread(){
-    return t_loopInThisThread;
-}
 
 
 bool EventLoop::isInLoopThread() {
@@ -139,16 +132,19 @@ void EventLoop::quit() {
 
 void EventLoop::updateChannel(Channel* channel) {
     assert(channel->ownerLoop() == this);
-    poller_->updateChannel(channel);
+    runInLoop(std::bind(&Poller::updateChannel, poller_.get(), channel));
 }
 
 void EventLoop::removeChannel(Channel* channel) {
     assert(channel->ownerLoop() == this);
-    poller_->removeChannel(channel);
+    runInLoop(std::bind(&Poller::removeChannel, poller_.get(), channel));
 }
 
 TimerId EventLoop::runAt(const Timestamp time, const TimerCallback &cb) {
-    return timerQueue_->addTimer(cb, time, 0.0);
+    auto timer = std::make_shared<Timer> (cb, time, 0.0);
+    TimerId id = timer;
+    runInLoop(std::bind(&TimerQueue::addTimer, timerQueue_.get(), std::move(timer)));
+    return id;
 }
 
 TimerId EventLoop::runAfter(double delay, const TimerCallback &cb) {
@@ -158,11 +154,14 @@ TimerId EventLoop::runAfter(double delay, const TimerCallback &cb) {
 
 TimerId EventLoop::runEvery(double interval, const TimerCallback &cb) {
     Timestamp time = util::getTimeOfNow() + (Timestamp) (interval * 1000000);
-    return timerQueue_->addTimer(cb, time, interval);
+    auto timer = std::make_shared<Timer> (cb, time, interval);
+    TimerId id = timer;
+    runInLoop(std::bind(&TimerQueue::addTimer, timerQueue_.get(), std::move(timer)));
+    return id;
 }
 
 void EventLoop::cancel(TimerId timerId) {
-    timerQueue_->cancelTimer(timerId);
+    runInLoop(std::bind(&TimerQueue::cancelTimer, timerQueue_.get(), timerId));
 }
 
 void EventLoop::runInLoop(const Task& cb) {

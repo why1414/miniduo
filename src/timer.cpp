@@ -50,6 +50,12 @@ void resetTimerfd(int timerfd, Timestamp expiration) {
 
 }
 
+void closeTimerfd(int fd) {
+    if(fd > 0) {
+        ::close(fd);
+    }
+}
+
 } // namespace miniduo
 
 
@@ -71,27 +77,28 @@ TimerQueue::TimerQueue(EventLoop* loop)
 }
 
 TimerQueue::~TimerQueue() {
-    ::close(timerfd_);
+    closeTimerfd(timerfd_);
     // delete all Timers
     // ??? do not remove channel, since we're in EventLoop::dtor();
-    // Guess: in EventLoop::dtor(), there're still some channels, if remove the channel,
-    //        it will disorder channel vector/array.
+    // Guess: EventLoop is destroying, it is not safe to call removeChannel, 
+    // and it's necessary because the poller will be destoryed too.
+
 }
 
 /// thread safe
-TimerId TimerQueue::addTimer(const TimerCallback& cb,
-                             Timestamp when,
-                             double interval)
-{
-    // Timer* timer = new Timer(cb, when, interval);
-    log_trace("Enter addTimer()");
-    auto timer = std::make_shared<Timer>(cb, when, interval);
-    TimerId id = timer;
-    loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, std::move(timer)));
-    return id;
-}     
+// TimerId TimerQueue::addTimer(const TimerCallback& cb,
+//                              Timestamp when,
+//                              double interval)
+// {
+//     // Timer* timer = new Timer(cb, when, interval);
+//     log_trace("Enter addTimer()");
+//     auto timer = std::make_shared<Timer>(cb, when, interval);
+//     TimerId id = timer;
+//     loop_->runInLoop(std::bind(&TimerQueue::addTimerInLoop, this, std::move(timer)));
+//     return id;
+// }     
 
-void TimerQueue::addTimerInLoop(std::shared_ptr<Timer> timer) {
+void TimerQueue::addTimer(std::shared_ptr<Timer> timer) {
     loop_->assertInLoopThread();
     Timestamp when = timer->expiration();
     bool earliestChanged = insert(std::move(timer));
@@ -100,14 +107,8 @@ void TimerQueue::addTimerInLoop(std::shared_ptr<Timer> timer) {
     }
 }
 
-void TimerQueue::cancelTimer(TimerId timerId) {
-    if(timerId.expired()) {
-        return;
-    }
-    loop_->runInLoop(std::bind(&TimerQueue::cancelTimerInLoop, this, timerId));
-}
 
-void TimerQueue::cancelTimerInLoop(TimerId timerId) {
+void TimerQueue::cancelTimer(TimerId timerId) {
     loop_->assertInLoopThread();
     if(std::shared_ptr<Timer> timer = timerId.lock()) {
         TimerEntry timerEntry(timer->expiration(), timer);

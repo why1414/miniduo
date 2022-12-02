@@ -49,7 +49,7 @@ public:
     void hasWritten(size_t len);
 
     const char* findCRLF() const {
-        const char* crlf = std::search(begin(), beginWrite(), kCRLF, kCRLF+2);
+        const char* crlf = std::search(beginRead(), beginWrite(), kCRLF, kCRLF+2);
         return crlf == beginWrite() ? nullptr : crlf;
     };
     const char* findCRLF(const char* start) const {

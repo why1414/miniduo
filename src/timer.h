@@ -56,11 +56,9 @@ public:
     ~TimerQueue();
     /// Schedules the callback to be run at given time.
     /// repeats if arg interval > 0.0
-    /// Thread safe
-    TimerId addTimer(const TimerCallback& cb,
-                     Timestamp when,
-                     double interval);
-    /// Thread safe
+    /// not Thread safe
+    void addTimer(std::shared_ptr<Timer> timer);
+    /// Not Thread safe
     void cancelTimer(TimerId timerId);
     /// @brief  Called by EventLoop to register the tiemrfd channel to poller
     void enableChannel() {
@@ -81,8 +79,7 @@ private:
     /// @return return true if the earliest expiration in timers_ changed
     bool insert(std::shared_ptr<Timer> timer);
   
-    void addTimerInLoop(std::shared_ptr<Timer> timer);
-    void cancelTimerInLoop(TimerId timerId);
+    // void addTimerInLoop(std::shared_ptr<Timer> timer);
 
     EventLoop* loop_; // owner loop;
     const int timerfd_;

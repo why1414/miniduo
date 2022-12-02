@@ -22,7 +22,6 @@ Poller::~Poller()
 // 然后填充 调用方传入的 activeChannels, 并返回 poll(2)
 // return 的时刻。
 Timestamp Poller::poll(int timeoutMs, ChannelList* activeChannels) {
-
     int numEvents = ::poll(pollfds_.data(), pollfds_.size(), timeoutMs);
     Timestamp now = util::getTimeOfNow(); // get current time;
     if(numEvents > 0) {
@@ -69,7 +68,7 @@ void Poller::fillActiveChannels(int numEvents,
 
 /// 负责维护和更新pollfds_数组。
 /// 添加 Channel 的复杂度 O(logN), 更新已有Channel是 O(1)
-void Poller::updateChannelInLoop(Channel* channel) {
+void Poller::updateChannel(Channel* channel) {
     assertInLoopThread();
     // log << "fd = " << channel->fd() << " events = " << channel->events();
     log_trace("Poller update: fd = %d, intrested events = %d", channel->fd(), channel->events());
@@ -105,7 +104,7 @@ void Poller::updateChannelInLoop(Channel* channel) {
     }    
 }
 
-void Poller::removeChannelInLoop(Channel* channel) {
+void Poller::removeChannel(Channel* channel) {
     loop_->assertInLoopThread();
     log_trace("fd = %d", channel->fd());
     assert(channels_.find(channel->fd()) != channels_.end());

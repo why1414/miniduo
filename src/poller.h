@@ -39,18 +39,10 @@ public:
     // Polls the I/O events, called in the loop thread, return current Timepoint.
     Timestamp poll(int timeoutMs, ChannelList* activeChannels);
 
-    /// Thread safe
-    void updateChannel(Channel* channel) {
-        loop_->runInLoop(
-            std::bind(&Poller::updateChannelInLoop, this, channel)
-        );
-    }
-    /// Thread safe
-    void removeChannel(Channel* channel) {
-        loop_->runInLoop(
-            std::bind(&Poller::removeChannelInLoop, this, channel)
-        );
-    };
+    /// Not Thread safe
+    void updateChannel(Channel* channel) ;
+    /// Not Thread safe
+    void removeChannel(Channel* channel) ;
 
     void assertInLoopThread() { loop_->assertInLoopThread(); }
 
@@ -59,8 +51,8 @@ public:
 private:
     void fillActiveChannels(int numEvents,
                             ChannelList* activeChannels) const;
-    void updateChannelInLoop(Channel* channel);
-    void removeChannelInLoop(Channel* channel);
+    // void updateChannelInLoop(Channel* channel);
+    // void removeChannelInLoop(Channel* channel);
 
     typedef std::vector<struct pollfd> PollFdList;
     typedef std::map<int, Channel*> ChannelMap;  // fd -> channel*

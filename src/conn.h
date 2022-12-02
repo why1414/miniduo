@@ -25,6 +25,11 @@ public:
     typedef std::function<void (int sockfd, const SockAddr&)> NewConnectionCallback;
     
     Acceptor(EventLoop* loop, const SockAddr& listenAddr);
+    ~Acceptor() {
+        if(acceptFd_ > 0) {
+            socket::close(acceptFd_);
+        }
+    };
 
     void setNewConnectionCallback(const NewConnectionCallback& cb) {
         newConnectionCallback_ = cb;
