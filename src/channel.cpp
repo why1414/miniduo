@@ -14,10 +14,30 @@ Channel::Channel(EventLoop* loop, int fdArg)
     : loop_(loop),
       fd_(fdArg),
       events_(0),
-      revents_(0),
-      index_(-1)
+      revents_(0)
 {
 
+}
+
+
+void Channel::enableReading(bool enable) {
+    if(enable) {
+        events_ |= kReadEvent;
+    }
+    else {
+        events_ &= ~kReadEvent;
+    }
+    update();
+}
+
+void Channel::enableWriting(bool enable) {
+    if(enable) {
+        events_ |= kWriteEvent;
+    }
+    else {
+        events_ &= ~kWriteEvent;
+    }
+    update();
 }
 
 // Channel::update() 会调用 EventLoop::updateChannel() ，

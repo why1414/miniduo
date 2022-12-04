@@ -11,13 +11,13 @@
  
 #include "timer.h"
 #include "util.h"
+#include "poller.h"
+#include "channel.h"
 
 namespace miniduo{
 
 
 
-class Channel;
-class Poller;
 class TimerQueue;
 
 class EventLoop {
@@ -32,6 +32,8 @@ public:
 
     void loop();
     void quit();
+    // thread safe (RunInLoop)
+    void addChannel(Channel* channel);
     // thread safe (RunInLoop)
     void updateChannel(Channel* channel);
     // thread safe (RunInLoop)
@@ -71,7 +73,7 @@ private:
     typedef std::vector<Channel*> ChannelList;
     
     std::atomic<bool> stoplooping_; /* atomic */
-    std::unique_ptr<Poller> poller_;
+    std::unique_ptr<PollPoller> poller_;
     std::unique_ptr<TimerQueue> timerQueue_;
     ChannelList activeChannels_;
 

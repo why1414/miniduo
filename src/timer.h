@@ -6,12 +6,11 @@
 #include "channel.h" //不添加 timerfdChannel_ 报错
 #include "util.h" // Timestamp
 
+
 namespace miniduo {
 
-class EventLoop;
-class Channel;
 class Timer;
-
+class EventLoop;
 // typedef int64_t Timestamp; // microseconds since the epoch
 // typedef std::pair<Timestamp, Timer*> TimerId;
 typedef std::weak_ptr<Timer> TimerId;
@@ -61,9 +60,7 @@ public:
     /// Not Thread safe
     void cancelTimer(TimerId timerId);
     /// @brief  Called by EventLoop to register the tiemrfd channel to poller
-    void enableChannel() {
-        timerfdChannel_.enableReading();
-    }
+    void enableChannel() ;
 
 private:
     typedef std::pair<Timestamp, std::shared_ptr<Timer>> TimerEntry; /// 

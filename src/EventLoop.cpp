@@ -52,7 +52,7 @@ using namespace miniduo;
 EventLoop::EventLoop()
     : stoplooping_(true),
       tid_(-1),
-      poller_(new Poller(this)),     
+      poller_(new PollPoller(this)),     
       wakeupFd_(createEventfd()),
       wakeupChannel_(new Channel(this, wakeupFd_)),
       timerQueue_(new TimerQueue(this))
@@ -64,7 +64,8 @@ EventLoop::EventLoop()
     wakeupChannel_->setReadCallback(
         std::bind(&EventLoop::handleRead, this, std::placeholders::_1)
     );
-    wakeupChannel_->enableReading();
+    addChannel(wakeupChannel_.get());
+    wakeupChannel_->enableReading(true);
     // runInLoop(std::bind(&Channel::enableReading, this->wakeupChannel_.get()));
     timerQueue_->enableChannel();
  
@@ -130,14 +131,19 @@ void EventLoop::quit() {
     }
 }
 
+void EventLoop::addChannel(Channel* channel) {
+    assert(channel->ownerLoop() == this);
+    runInLoop(std::bind(&PollPoller::addChannel, poller_.get(), channel));
+}
+
 void EventLoop::updateChannel(Channel* channel) {
     assert(channel->ownerLoop() == this);
-    runInLoop(std::bind(&Poller::updateChannel, poller_.get(), channel));
+    runInLoop(std::bind(&BasePoller::updateChannel, poller_.get(), channel));
 }
 
 void EventLoop::removeChannel(Channel* channel) {
     assert(channel->ownerLoop() == this);
-    runInLoop(std::bind(&Poller::removeChannel, poller_.get(), channel));
+    runInLoop(std::bind(&BasePoller::removeChannel, poller_.get(), channel));
 }
 
 TimerId EventLoop::runAt(const Timestamp time, const TimerCallback &cb) {

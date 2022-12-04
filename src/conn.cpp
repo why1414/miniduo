@@ -25,9 +25,11 @@ Acceptor::Acceptor(EventLoop* loop, const SockAddr& listenAddr)
 
 void Acceptor::listen() {
     // loop_->assertInLoopThread();
+    log_trace("enable listen");
     listening_ = true;
     socket::listenSock(acceptFd_);
-    acceptChannel_.enableReading();
+    loop_->addChannel(&acceptChannel_);
+    acceptChannel_.enableReading(true);
 }
 
 void Acceptor::handleRead(Timestamp recvTime) {
@@ -101,11 +103,11 @@ void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
 void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn) {
     loop_->assertInLoopThread();
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
-    // assert( connections_.find(conn->name()) != connections_.end() );
-    if(connections_.find(conn->name()) == connections_.end()) {
-        log_debug("conn:%s has been removed", conn->name().c_str());
-        return;
-    }
+    assert( connections_.find(conn->name()) != connections_.end() );
+    // if(connections_.find(conn->name()) == connections_.end()) {
+    //     log_debug("conn:%s has been removed", conn->name().c_str());
+    //     return;
+    // }
     size_t n = connections_.erase(conn->name());
     // queueInLoop: 确保 TcpConn 不会在 IO 处理中handleclose析构
     conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));   
@@ -145,7 +147,8 @@ void TcpConnection::connectEstablished() {
     loop_->assertInLoopThread();
     assert(state_ == StateE::kConnecting);
     setState(StateE::kConnected);
-    connChannel_->enableReading();
+    loop_->addChannel(connChannel_.get());
+    connChannel_->enableReading(true);
     connectionCallback_(shared_from_this());
 }
 
@@ -183,7 +186,7 @@ void TcpConnection::handleClose() {
     assert(state_ == StateE::kConnected 
             || state_ == StateE::kDisconnecting);
     connChannel_->disableAll();
-    loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
+    // loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
     // TcpServer::removeConnection
     closeCallback_(shared_from_this());
 }
@@ -204,7 +207,7 @@ void TcpConnection::handleWrite() {
             output_.retrieve(n);
             if(output_.readableBytes() == 0) 
             {
-                connChannel_->disableWriting();
+                connChannel_->enableWriting(false);
                 if(writeCompleteCallback_) {
                     loop_->queueInLoop(
                         std::bind(writeCompleteCallback_, shared_from_this())
@@ -265,7 +268,7 @@ void TcpConnection::sendInLoop(const std::string& msg) {
     loop_->assertInLoopThread();
     output_.append(msg.data(), msg.size());
     if(!connChannel_->isWriting()) {
-        connChannel_->enableWriting();
+        connChannel_->enableWriting(true);
     }
 }
 

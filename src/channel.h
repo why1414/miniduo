@@ -2,6 +2,7 @@
 
 #include <functional> // function<T>
 #include "util.h" // Timestamp
+// #include "EventLoop.h"
 
 namespace miniduo{
 
@@ -26,21 +27,17 @@ public:
     void setErrorCallback(const EventCallback& cb){
         errorCallback_ =cb;
     }
+    
 
     int fd() const { return fd_; }
-    int events() const { return events_; }
+    int events() const { return events_; }          
     void setRevents(int revt) { revents_ = revt; }
     bool isNoneEvent() const { return events_ == kNoneEvent; }
     bool isWriting() const { return events_ & kWriteEvent; }
     // 将 readable event 添加到感兴趣事件中，并在poller更新
-    void enableReading() { events_ |= kReadEvent; update(); }
-    void enableWriting() { events_ |= kWriteEvent; update(); }
-    void disableWriting() { events_ &= ~kWriteEvent; update(); }
+    void enableReading(bool enable);
+    void enableWriting(bool enable);
     void disableAll() { events_ = kNoneEvent; update(); }
-
-    // for Poller
-    int index() { return index_; }
-    void setIndex(int idx) { index_ = idx; }
 
     EventLoop* ownerLoop() { return loop_; }
 
@@ -55,7 +52,6 @@ private:
     const int  fd_;
     int        events_;  // channel 关心的 IO 事件
     int        revents_; // 当前活动的事件，由 EventLoop/Poller 设置
-    int        index_;   // used by Poller
 
     ReadEventCallback readCallback_;
     EventCallback writeCallback_;

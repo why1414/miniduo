@@ -1,67 +1,67 @@
-/*
-Poller 是 EventLoop 的间接成员，只供其 owner EventLoop
-在 IO 线程调用，因此无须加锁
-
-Poller 是一个抽象基类，通过派生类同时支持 poll 和 epoll
-两种 IO multiplexing机制
-
-Poller 生命周期与 EventLoop 相等，Poller 不拥有 Channel
-，Channel 在析构前必须自己 unregister (EventLoop::removeChannel())
-避免空悬指针
-
-*/
-
 #pragma once
-#include <vector>
-#include <map>
-#include <functional> // std::bind()
 
-#include "EventLoop.h"
 #include "util.h" // Timestamp
 
-struct pollfd; // 避免 include<poll.h>
+
+#include <vector>
+#include <map>
+#include <poll.h> // struct pollfd
+
 
 namespace miniduo {
 
 class Channel;
+class EventLoop;
 
-class Poller {
-
-    Poller(const Poller&) = delete;
-    Poller& operator=(const Poller&) = delete;
-
+class BasePoller {
+    BasePoller(const BasePoller&) = delete;
+    BasePoller& operator=(const BasePoller&) = delete;
 public:
+    BasePoller(EventLoop* loop): loop_(loop) {}
+    virtual ~BasePoller() = 0;
     typedef std::vector<Channel*> ChannelList;
+
+    virtual Timestamp poll(int timeoutMs, ChannelList* activeChannelList) = 0;
+
+    virtual void addChannel(Channel* channel) = 0;
+
+    virtual void removeChannel(Channel* channel) = 0;
+
+    virtual void updateChannel(Channel *channel) = 0;
+
+    void assertInLoop() const ;
+
+protected:
     
-    Poller(EventLoop* loop);
-    ~Poller();
+private:
+    EventLoop* loop_;
 
-    // Polls the I/O events, called in the loop thread, return current Timepoint.
-    Timestamp poll(int timeoutMs, ChannelList* activeChannels);
+}; // class Poller
 
-    /// Not Thread safe
-    void updateChannel(Channel* channel) ;
-    /// Not Thread safe
-    void removeChannel(Channel* channel) ;
 
-    void assertInLoopThread() { loop_->assertInLoopThread(); }
+class PollPoller: public BasePoller {
+public:
+    
+    PollPoller(EventLoop* loop):BasePoller(loop) {}
+    ~PollPoller() override;
 
+    Timestamp poll(int timeoutMs, ChannelList* activeChannels) override;
+    void addChannel(Channel* channel) override;
+    void updateChannel(Channel* channel) override;
+    void removeChannel(Channel* channel) override;
 
 
 private:
-    void fillActiveChannels(int numEvents,
-                            ChannelList* activeChannels) const;
-    // void updateChannelInLoop(Channel* channel);
-    // void removeChannelInLoop(Channel* channel);
+    typedef std::vector<struct pollfd> PollfdList;
+    // fd-> {Channel*, index in pollfds_}
+    typedef std::map<int, std::pair<Channel*, int>> ChannelMap;
 
-    typedef std::vector<struct pollfd> PollFdList;
-    typedef std::map<int, Channel*> ChannelMap;  // fd -> channel*
+    void fillActiveChannels(int numEvents, ChannelList* activeChannels) const;
 
-    EventLoop* loop_;
-    PollFdList pollfds_;   // 缓存 pollfd 数组
+    PollfdList pollfds_;
     ChannelMap channels_;
 
-};
+}; // class PollPoller
 
 
 } // namespace miniduo

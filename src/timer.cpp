@@ -98,6 +98,11 @@ TimerQueue::~TimerQueue() {
 //     return id;
 // }     
 
+void TimerQueue::enableChannel() {
+    loop_->addChannel(&timerfdChannel_);
+    timerfdChannel_.enableReading(true);
+}
+
 void TimerQueue::addTimer(std::shared_ptr<Timer> timer) {
     loop_->assertInLoopThread();
     Timestamp when = timer->expiration();
