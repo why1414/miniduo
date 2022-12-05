@@ -60,7 +60,16 @@ TcpServer::TcpServer(EventLoop* loop, const SockAddr& listenAddr)
 }
 
 TcpServer::~TcpServer() {
-
+    loop_->assertInLoopThread();
+    log_trace("TcpServer::~TcpServer");
+    // 释放所有TcpConn
+    for(auto& item: connections_) {
+        TcpConnectionPtr conn(item.second);
+        item.second.reset();
+        conn->getLoop()->runInLoop(
+            std::bind(&TcpConnection::connectDestroyed, conn)
+        );
+    }
 }
 
 void TcpServer::start() {
@@ -91,24 +100,21 @@ void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
     conn->setCloseCallback(
         std::bind(&TcpServer::removeConnection, this, std::placeholders::_1));
     conn->setWriteCompleteCallback(writeCompleteCallback_);
-    ioLoop->runInLoop([conn] {conn->connectEstablished();});
+    conn->getLoop()->runInLoop([conn] {conn->connectEstablished();});
     // conn->connectEstablished();
 
 }
 
 void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
-    loop_->runInLoop([this, conn] {removeConnectionInLoop(conn);});
+    loop_->runInLoop([this, &conn] {removeConnectionInLoop(conn);});
 }
 
 void TcpServer::removeConnectionInLoop(const TcpConnectionPtr& conn) {
     loop_->assertInLoopThread();
     log_info("TcpServer::removeConnection [%s] - connection", conn->name().c_str());
     assert( connections_.find(conn->name()) != connections_.end() );
-    // if(connections_.find(conn->name()) == connections_.end()) {
-    //     log_debug("conn:%s has been removed", conn->name().c_str());
-    //     return;
-    // }
     size_t n = connections_.erase(conn->name());
+    assert(n == 1);
     // queueInLoop: 确保 TcpConn 不会在 IO 处理中handleclose析构
     conn->getLoop()->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));   
 }
@@ -154,11 +160,13 @@ void TcpConnection::connectEstablished() {
 
 void TcpConnection::connectDestroyed() {
     loop_->assertInLoopThread();
-    assert(state_ == StateE::kConnected 
-            || state_ == StateE::kDisconnecting);
-    setState(StateE::kDisconnected);
-    connChannel_->disableAll();
-    connectionCallback_(shared_from_this());
+    // assert(state_ == StateE::kConnected 
+    //         || state_ == StateE::kDisconnecting);
+    if(state_ == StateE::kConnected) {
+        setState(StateE::kDisconnected);
+        connChannel_->disableAll();
+        connectionCallback_(shared_from_this());
+    }
     loop_->removeChannel(connChannel_.get());
 }
 
@@ -185,7 +193,9 @@ void TcpConnection::handleClose() {
     log_trace("TcpConnection::handleClose state = %d", state_);
     assert(state_ == StateE::kConnected 
             || state_ == StateE::kDisconnecting);
+    setState(StateE::kDisconnected);
     connChannel_->disableAll();
+    connectionCallback_(shared_from_this());
     // loop_->queueInLoop(std::bind(closeCallback_, shared_from_this()));
     // TcpServer::removeConnection
     closeCallback_(shared_from_this());
@@ -236,28 +246,52 @@ void TcpConnection::handleWrite() {
 
 void TcpConnection::shutdown() {
     /// FIXME: make it thread safe for state_
-    if(state_ == StateE::kConnected) {
-        setState(StateE::kDisconnecting);
-        loop_->runInLoop(
-            std::bind(&TcpConnection::shutdownInLoop, this)
-        );
-    }
+    loop_->runInLoop(
+        std::bind(&TcpConnection::shutdownInLoop, this));
 }
 
 void TcpConnection::shutdownInLoop() {
     loop_->assertInLoopThread();
-    if(!connChannel_->isWriting()) {
-        socket::shutdownWrite(connChannel_->fd());
+    if(state_ == StateE::kConnected) {
+        setState(StateE::kDisconnecting);
+        if(!connChannel_->isWriting()) {
+            socket::shutdownWrite(connChannel_->fd());
+        }
+    }
+}
+
+void TcpConnection::close() {
+    // 立即关闭当前连接，已在任务队列中的未完成发射任务不会再执行
+    loop_->runInLoop(
+        [this] { loop_->queueInLoop(std::bind(&TcpConnection::closeInLoop, this));}
+    );
+}
+
+void TcpConnection::closeInNextLoop() {
+    // 延后一个loop循环再关闭tcp连接，
+    // 当前循环(loop)中已在任务队列的发射任务会在下一次loop的IO处理中执行
+    // 此处使用 两层queueInLoop 而不是 runInLoop，
+    // 是为了确保当前loop中，已在任务队列中的发送任务能够先完成
+    // closeInLoop() 会在下一次 loop 的任务队列中执行
+    loop_->queueInLoop(
+        [this] { loop_->queueInLoop(std::bind(&TcpConnection::closeInLoop, this));}
+    );
+}
+
+void TcpConnection::closeInLoop() {
+    loop_->assertInLoopThread();
+    if(state_ == StateE::kConnected || state_ == StateE::kDisconnecting) {
+        // setState(StateE::kDisconnected);
+        handleClose();
     }
 }
 
 void TcpConnection::send(const std::string& msg) {
     assert(msg.size() > 0);
-    if(state_ == StateE::kConnected) {
-        loop_->runInLoop(
-            std::bind(&TcpConnection::sendInLoop, this, msg)
-        );
-    }
+    loop_->runInLoop(
+        std::bind(&TcpConnection::sendInLoop, this, msg)
+    );
+
 }
 
 
@@ -266,9 +300,11 @@ void TcpConnection::send(const std::string& msg) {
 /// @param msg 
 void TcpConnection::sendInLoop(const std::string& msg) {
     loop_->assertInLoopThread();
-    output_.append(msg.data(), msg.size());
-    if(!connChannel_->isWriting()) {
-        connChannel_->enableWriting(true);
+    if(state_ == StateE::kConnected) {
+        output_.append(msg.data(), msg.size());
+        if(!connChannel_->isWriting()) {
+            connChannel_->enableWriting(true);
+        }
     }
 }
 

@@ -128,6 +128,10 @@ public:
     void shutdown();
     // Thread safe
     void send(const std::string& msg);
+    // Thread safe
+    void close();
+    // Thread safe;
+    void closeInNextLoop();
 
 private:
     enum class StateE { kConnecting, kConnected, kDisconnecting, kDisconnected, };
@@ -136,6 +140,7 @@ private:
         state_ = s;
     }
     void shutdownInLoop();
+    void closeInLoop();
     void sendInLoop(const std::string& msg);
     void handleRead(Timestamp recvTime);
     void handleWrite();
@@ -152,10 +157,10 @@ private:
     std::unique_ptr<Channel> connChannel_;
     SockAddr localAddr_;
     SockAddr peerAddr_;
-    ConnectionCallback connectionCallback_;
-    MsgCallback msgCallback_;
-    CloseCallback closeCallback_;
-    WriteCompleteCallback writeCompleteCallback_;
+    ConnectionCallback connectionCallback_; // 用户回调
+    MsgCallback msgCallback_; // 用户回调
+    CloseCallback closeCallback_; // 绑定 TcpSever::removeConnection()
+    WriteCompleteCallback writeCompleteCallback_; // 用户回调
 
 
 }; // class TcpConnection
