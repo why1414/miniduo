@@ -52,7 +52,7 @@ using namespace miniduo;
 EventLoop::EventLoop()
     : stoplooping_(true),
       tid_(-1),
-      poller_(new PollPoller(this)),     
+      poller_(new EPollPoller(this)),     
       wakeupFd_(createEventfd()),
       wakeupChannel_(new Channel(this, wakeupFd_)),
       timerQueue_(new TimerQueue(this))
@@ -133,7 +133,7 @@ void EventLoop::quit() {
 
 void EventLoop::addChannel(Channel* channel) {
     assert(channel->ownerLoop() == this);
-    runInLoop(std::bind(&PollPoller::addChannel, poller_.get(), channel));
+    runInLoop(std::bind(&BasePoller::addChannel, poller_.get(), channel));
 }
 
 void EventLoop::updateChannel(Channel* channel) {

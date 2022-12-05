@@ -73,7 +73,7 @@ private:
     typedef std::vector<Channel*> ChannelList;
     
     std::atomic<bool> stoplooping_; /* atomic */
-    std::unique_ptr<PollPoller> poller_;
+    std::unique_ptr<BasePoller> poller_;
     std::unique_ptr<TimerQueue> timerQueue_;
     ChannelList activeChannels_;
 

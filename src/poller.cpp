@@ -4,6 +4,8 @@
 
 #include <poll.h>
 #include <cassert>
+#include <unistd.h>
+#include <cstring> // memset()
 // #include <pair>
 
 using namespace miniduo;
@@ -113,5 +115,128 @@ void PollPoller::removeChannel(Channel* channel) {
         channels_[endfd].second = idx;
     }
     pollfds_.pop_back();
+}
 
+
+EPollPoller::EPollPoller(EventLoop* loop)
+    : BasePoller(loop),
+      epollfd_(::epoll_create1(EPOLL_CLOEXEC)),
+      events_(kInitEventListSize)
+{
+    if(epollfd_ < 0) {
+        exit_if(true, "EPollPoller::EPollPoller");
+    }
+}
+
+EPollPoller::~EPollPoller() {
+    ::close(epollfd_);
+}
+
+Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels) {
+    log_trace("fd total count: %d", channels_.size());
+    int numEvents = ::epoll_wait(epollfd_,
+                                 events_.data(),
+                                 static_cast<int>(events_.size()),
+                                 timeoutMs);
+    int saveErrno = errno;
+    Timestamp now = util::getTimeOfNow();
+    if(numEvents > 0) {
+        log_trace("%d events happened", numEvents);
+        fillActiveChannels(numEvents, activeChannels);
+        if(static_cast<size_t>(numEvents) == events_.size()) {
+            events_.resize(events_.size()*2);
+        }
+    }
+    else if(numEvents == 0) {
+        log_trace("nothing happened");
+    }
+    else {
+        if(saveErrno != EINTR) {
+            errno = saveErrno;
+            log_error("EPollPoller::poll");
+        }
+    }
+    return now;
+}
+
+void EPollPoller::fillActiveChannels(int numEvents,
+                                     ChannelList* activeChannels) const
+{
+    assert(static_cast<size_t>(numEvents) <= events_.size());
+    for(int i=0; i<numEvents; i++) {
+        Channel* channel = static_cast<Channel*> (events_[i].data.ptr);
+#ifndef NDEBUG
+        const int fd = channel->fd();
+        ChannelMap::const_iterator it = channels_.find(fd);
+        assert(it != channels_.end());
+        assert(it->second.first == channel);
+#endif
+        channel->setRevents(events_[i].events);
+        activeChannels->push_back(channel);
+    }
+}
+
+void EPollPoller::addChannel(Channel* channel) {
+    assertInLoop();
+    const int fd = channel->fd();
+    log_trace("fd = %d", fd);
+    assert(channels_.find(fd) == channels_.end());
+    channels_[fd] = {channel, ChannelState::NEW};
+    updateChannel(channel); 
+}
+
+void EPollPoller::updateChannel(Channel* channel) {
+    assertInLoop();
+    const int fd = channel->fd();
+    log_trace("fd = %d", fd);
+    assert(channels_.find(fd) != channels_.end());
+    assert(channels_[fd].first == channel);
+    if(channels_[fd].second == ChannelState::NEW 
+       || channels_[fd].second == ChannelState::DELETED) 
+    {
+        if(!channel->isNoneEvent()) {
+            channels_[fd].second = ChannelState::ADDED;
+            update(EPOLL_CTL_ADD, channel);
+        }
+    }
+    else { // if channels_[fd].second == ChannelState::ADDED
+        if(!channel->isNoneEvent()) {
+            update(EPOLL_CTL_MOD, channel);
+        }
+        else {
+            channels_[fd].second = ChannelState::DELETED;
+            update(EPOLL_CTL_DEL, channel);
+        }
+    }
+}
+
+
+
+void EPollPoller::removeChannel(Channel* channel) {
+    assertInLoop();
+    const int fd = channel->fd();
+    log_trace("fd = %d", fd);
+    assert(channels_.find(fd) != channels_.end());
+    assert(channels_[fd].first == channel);
+    assert(channel->isNoneEvent());
+    if(channels_[fd].second == ChannelState::ADDED) {
+        update(EPOLL_CTL_DEL, channel);
+    }
+    size_t n = channels_.erase(fd);
+    assert(n == 1);
+}
+
+
+void EPollPoller::update(int operation, Channel* channel) {
+    struct epoll_event event;
+    ::memset(&event, 0, sizeof event);
+    event.events = channel->events();
+    event.data.ptr = channel;
+    int fd = channel->fd();
+    log_trace("epoll_ctl_op: fd = %d update", fd);
+    int ret = ::epoll_ctl(epollfd_, operation, fd, &event);
+    if(ret < 0) {
+        ///  FIXME: 错误处理
+        log_fatal("EPollPoller::update: epoll_ctl ");
+    }
 }
