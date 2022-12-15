@@ -1,54 +1,57 @@
-# 检索src目录查找cpp为后缀文件，用shell指令的find
-# src 中多级目录的.cpp文件都会被找出
-SRCS := $(shell find src -name "*.cpp")
-TEST_SRCS := $(shell find test -name "*.cpp") 
+OPT ?= -g2
+AR := ar
+CC := cc
+CXX := g++
 
-# 将srcs的后缀为.cpp的替换为.o, 并让o文件放到objs目录中
-SRC_OBJS := $(SRCS:.cpp=.o)
-TEST_OBJS := $(TEST_SRCS:.cpp=.o)
+CFLAGS := -I. -pthread  -std=c++11  $(OPT)
+CXXFLAGS := -I. -pthread  -std=c++11  $(OPT)
 
-# 将src/前缀替换为objs/前缀，让o文件防到objs目录中
-SRC_OBJS := $(SRC_OBJS:src/%=objs/src/%)
-TEST_BINS := $(TEST_SRCS:test/%.cpp=%)
-TEST_OBJS := $(TEST_OBJS:test/%=objs/test/%)
+LDFLAGS := -pthread -lminiduo
+LIBS :=  
 
-# 定义objs下的o文件，依赖src下对应的cpp文件
-objs/src/%.o : src/%.cpp
-	@mkdir -p $(dir $@)
-	g++ -c -g $< -o $@
+SRC_DIR = miniduo
+WORKSPACE := workspace
 
-objs/test/%.o : test/%.cpp
-	@mkdir -p $(dir $@)
-	g++ -c -g -I ./src $< -o $@
+MINIDUO_SOURCES := $(shell find $(SRC_DIR) -name '*.cpp')
+MINIDUO_OBJECTS = $(MINIDUO_SOURCES:.cpp=.o)
 
+TEST_SOURCES = $(shell find test -name '*.cpp')
+TESTS = $(TEST_SOURCES:.cpp=)
 
-all :  $(TEST_BINS)
+EXAMPLE_SOURCES := $(shell find examples -name '*.cpp')
+EXAMPLES = $(EXAMPLE_SOURCES:.cpp=)
 
+LIBRARY = libminiduo.a
 
-# 我们把pro放到workspace下面
-$(TEST_BINS) : %:workspace/%
-workspace/% : objs/test/%.o $(SRC_OBJS)
-	g++ -g -pthread -Wall -o $@ $^
+TARGETS = $(LIBRARY) $(EXAMPLES) $(TESTS)
 
+default: $(TARGETS)
+miniduo_tests: $(TESTS)
+miniduo_examples: $(EXAMPLES)
+$(TESTS): 
+$(EXAMPLES): 
 
-debug : 
-# @echo objs is [$(objs)]
-	@echo $(TEST_BINS)
+install: $(LIBRARY)
+	sudo mkdir -p /usr/local/include/miniduo
+	sudo cp -f $(SRC_DIR)/*.h /usr/local/include/miniduo
+	sudo cp -f $(LIBRARY) /usr/local/lib
 
-run-%: %
-	@cd workspace && ./$< && cd ..
-	
+uninstall:
+	sudo rm -rf /usr/local/include/miniduo /usr/local/lib/$(LIBRARY)
 
-clean : clean_all
+clean:
+			-rm -f $(TARGETS)
+			-rm -f */*.o
 
-clean_all : 
-	rm -rf workspace/* objs/*
+$(LIBRARY): $(MINIDUO_OBJECTS)
+		rm -f $@
+		$(AR) -rs $@ $(MINIDUO_OBJECTS)
 
-clean_tests :
-	rm -rf workspace/* objs/test/*
+.cpp.o:
+		$(CXX) $(CXXFLAGS) -c $< -o $@
 
-.PHONY : $(TEST_BINS) run-% debug test all clean
-# .PRECIOUS : $(SRC_OBJS) $(TEST_OBJS) # 临时解决 %.o 文件自动删除的问题
-.SECONDARY:
+.c.o:
+		$(CC) $(CFLAGS) -c $< -o $@
 
-
+.cpp:
+		$(CXX) -o $@ $< $(CXXFLAGS) $(LDFLAGS)  $(LIBS)
