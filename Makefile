@@ -1,4 +1,4 @@
-OPT ?= -g2
+OPT := -g
 AR := ar
 CC := cc
 CXX := g++
@@ -6,7 +6,7 @@ CXX := g++
 CFLAGS := -I. -pthread  -std=c++11  $(OPT)
 CXXFLAGS := -I. -pthread  -std=c++11  $(OPT)
 
-LDFLAGS := -pthread -lminiduo
+LDFLAGS := -pthread
 LIBS :=  
 
 SRC_DIR = miniduo
@@ -28,8 +28,8 @@ TARGETS = $(LIBRARY) $(EXAMPLES) $(TESTS)
 default: $(TARGETS)
 miniduo_tests: $(TESTS)
 miniduo_examples: $(EXAMPLES)
-$(TESTS): 
-$(EXAMPLES): 
+$(TESTS): $(LIBRARY)
+$(EXAMPLES): $(LIBRARY)
 
 install: $(LIBRARY)
 	sudo mkdir -p /usr/local/include/miniduo
@@ -39,13 +39,14 @@ install: $(LIBRARY)
 uninstall:
 	sudo rm -rf /usr/local/include/miniduo /usr/local/lib/$(LIBRARY)
 
-clean:
-			-rm -f $(TARGETS)
-			-rm -f */*.o
+# run-%: %
+# 	cd $(WORKSPACE) && ../$<
+# 	cd ..
 
 $(LIBRARY): $(MINIDUO_OBJECTS)
 		rm -f $@
 		$(AR) -rs $@ $(MINIDUO_OBJECTS)
+		rm -f */*.o
 
 .cpp.o:
 		$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -54,4 +55,21 @@ $(LIBRARY): $(MINIDUO_OBJECTS)
 		$(CC) $(CFLAGS) -c $< -o $@
 
 .cpp:
-		$(CXX) -o $@ $< $(CXXFLAGS) $(LDFLAGS)  $(LIBS)
+		$(CXX) -o $@ $< $(CXXFLAGS) $(LDFLAGS)  $(LIBS) $(LIBRARY)
+
+
+
+
+clean:
+			-rm -f $(TARGETS)
+			-rm -f */*.o
+clean_tests:
+	rm -f $(TESTS)
+
+clean_examples:
+	rm -f $(EXAMPLES)
+
+clean_bins: clean_tests clean_examples
+
+clean_objs:
+	rm -f */*.o

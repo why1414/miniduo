@@ -1,9 +1,9 @@
 #include <sys/timerfd.h>
 #include <cstring>
 #include <unistd.h>
-#include "EventLoop.h"
-#include "channel.h"
-#include "util.h"
+#include "miniduo/EventLoop.h"
+#include "miniduo/channel.h"
+#include "miniduo/util.h"
 
 
 miniduo::EventLoop *gLoop;
@@ -26,7 +26,7 @@ int main()
     miniduo::Channel channel(&loop, timerfd);
 
     channel.setReadCallback(timeout);
-    channel.enableReading();
+    channel.enableReading(true);
     
 
     struct itimerspec howlong;

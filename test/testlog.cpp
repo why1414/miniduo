@@ -14,7 +14,7 @@ void func(int id) {
     log_trace("worker thread %d", id);
     // log_debug("test test");
     // cout<<id<<endl;
-    exit_if(id == 1, "error, process exit");
+    // exit_if(id == 1, "error, process exit");
 }
 
 
