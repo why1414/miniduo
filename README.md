@@ -1,5 +1,5 @@
 ## 简介
-miniduo 是一个多线程 C++ 网络库，基于 Reactor 模式。Miniduo 主要的设计与实现是基于陈硕的 << Linux多线程服务端编程 >> 中 “muduo网络库设计与实现” 相应部分，做了相应的实现与删改，并针对C++ 11做了相应的修改。本项目主要是作为学习Linux网络编程与多线程编程的实践项目。
+miniduo 是一个多线程 C++ 网络库，基于 Reactor 模式。Miniduo 主要的设计与实现是基于陈硕的 << Linux多线程服务端编程 >> 中 “muduo网络库设计与实现”。本项目主要是作为学习Linux网络编程与多线程编程的实践项目。
 
 ## Features
 - 基于非阻塞 I/O 和 I/O 多路复用的 的 Reactor 事件循环，支持 poll 和 epoll
@@ -52,8 +52,11 @@ int main(int argc, const char *argv[]) {
 
 ## 安装与使用
 测试环境
+
 Ubuntu 20.04.4 LTS
+
 Linux version 5.10.16.3-microsoft-standard-WSL2
+
 gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.1) 
 ```
 make && make install
@@ -148,7 +151,10 @@ Requests: 3210 susceed, 0 failed.
 
 ## References
 
-陈硕, Linux 多线程服务端编程, https://book.douban.com/subject/20471211/
-游双, Linux 高性能服务器编程, https://book.douban.com/subject/24722611/
-陈硕, muduo 多线程C++网络库, https://github.com/chenshuo/muduo
-yedf2, handy 简洁易用的C++11网络库, https://github.com/yedf2/handy
+陈硕, Linux多线程服务端编程, https://book.douban.com/subject/20471211/
+
+游双, Linux高性能服务器编程, https://book.douban.com/subject/24722611/
+
+陈硕, muduo--多线程C++网络库, http://github.com/chenshuo/muduo
+
+yedf2, handy--简洁易用的C++11网络库, https://github.com/yedf2/handy
