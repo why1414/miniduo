@@ -11,6 +11,7 @@ void func(int id) {
     // Logger::getLogger().logv(Logger::LogLevel(id), "%d", id);
     // log(Logger::LogLevel(5), "sfda", "%d", id);
     // log(Logger::LogLevel(5), "sfda", "sdfad");
+    
     log_trace("worker thread %d", id);
     // log_debug("test test");
     // cout<<id<<endl;
@@ -21,6 +22,7 @@ void func(int id) {
 int main() {
     // Logger::getLogger().setLogLevel(Logger::LogLevel::ERROR);
     vector<thread> ts;
+    // set_logSwitchToStdout();
     for(int i=0; i<20; i++) {
         ts.push_back(thread(func, i));
     }

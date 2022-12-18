@@ -7,23 +7,30 @@
 #include <stdarg.h> // va_*
 #include <sstream>
 #include <chrono>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h> // ::open()
+#include <cstring> // ::strerror()
+#include <cassert>
 
 
 
 
-Logger::Logger(LogLevel level = LogLevel::TRACE,
-               std::string fileBaseName = "log",
-               long rotateInterval = 24 * 60 * 60)
-    : level_(level),
-      fileBaseName_(fileBaseName),
-      rotateInterval_(rotateInterval),
-      lastRotate_(time(nullptr)),
-      fd_(1),
+Logger::Logger()
+    : level_(LogLevel::TRACE),
+      fileDir_("log/"),
+      fileBaseName_("log"),
+      rotateInterval_(24 * 60 * 60),
+      lastRotate_(::time(nullptr)),
+      fd_(-1),
       stopLogging_(false),
+      isfilelog_(true),
       backendThread_(std::thread(&Logger::process, this))
 
-{
-
+{   
+    ::mkdir(fileDir_.c_str(), 0);
+    newLogfile();
+    msgQueue_.push("[Logger created] \n");
 }
 
 Logger::~Logger() {
@@ -34,6 +41,7 @@ Logger::~Logger() {
         cv_.notify_one();        
     }
     backendThread_.join();
+    if(fd_ != 1) ::close(fd_);
     
     
 }
@@ -41,8 +49,9 @@ Logger::~Logger() {
 void Logger::process() {
     while(!stopLogging_) {
         // 检查fd_
-        tryRotate();
-
+        if(isfilelog_) {
+            tryRotate();
+        }
         std::unique_lock<std::mutex> lock(mut_);
 
         while(msgQueue_.empty() && !stopLogging_) {
@@ -54,12 +63,38 @@ void Logger::process() {
             msgQueue_.pop();
             lock.unlock();
             // 写入文件
-            int err = write(fd_, msg.c_str(), msg.size());
+            int err = ::write(fd_, msg.c_str(), msg.size());
             lock.lock();
         }
              
 
     }
+
+}
+
+void Logger::switchToStdout() {
+    if(fd_ > 0) {
+        ::close(fd_);
+    }
+    fd_ = 1;
+    isfilelog_ = false;
+}
+
+void Logger::newLogfile() {
+    assert(lastRotate_ > 0);
+    struct tm ntm;
+    ::localtime_r(&lastRotate_, &ntm);
+    char newname[4096];
+    ::snprintf( newname, sizeof(newname), 
+                "%s%s.%d%02d%02d%02d%02d", 
+                fileDir_.c_str(), fileBaseName_.c_str(), 
+                ntm.tm_year + 1900, ntm.tm_mon + 1, ntm.tm_mday, ntm.tm_hour, ntm.tm_min);
+    fd_ = ::open(newname, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, DEFFILEMODE);
+    if(fd_ < 0) {
+        fprintf(stderr, "open log file %s failed. msg: %s ignored\n", newname, ::strerror(errno));
+        exit(1);
+    }
+    
 
 }
 
@@ -91,6 +126,14 @@ void Logger::logv(const LogLevel level,
 
 /// TODO: 
 void Logger::tryRotate() {
+    time_t now = ::time(nullptr);
+    if((now - lastRotate_) < rotateInterval_ ) {
+        return ;
+    }
+    lastRotate_ = now;
+    ::close(fd_);
+    fd_ = -1;
+    newLogfile();
 
 }
 

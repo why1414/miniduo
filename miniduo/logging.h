@@ -33,6 +33,7 @@
 #define set_logLevel(l) Logger::getLogger().setLogLevel(l)
 #define set_logName(n)  Logger::getLogger().setFileBaseName(n)
 #define set_logInterval(i) Logger::getLogger().setRotateInterval(i)
+#define set_logSwitchToStdout() Logger::getLogger().switchToStdout()
 
 static std::string _CutParenthesesNTail(std::string&& prettyFunction) {
     auto pos = prettyFunction.find('(');
@@ -58,7 +59,7 @@ public:
     static Logger& getLogger();
     void logv(const LogLevel level, 
               const char* fmt, ...);
-    
+    void switchToStdout();
     void setLogLevel(LogLevel level);
     void setFileBaseName(std::string basename);
     void setRotateInterval(long interval);
@@ -69,16 +70,17 @@ public:
 private:
     // Logger();
     // 构造函数初始化参数
-    Logger(LogLevel level,
-           std::string fileBaseName,
-           long rotateInterval);
+    Logger();
     
     // 尝试切换log文件，只在后台线程中被调用
     void tryRotate(); 
-    
-    // 后台线程执行，把 消息队列flush
 
+    // 新建一个logfile，根据lastRotate_时间
+    void newLogfile();
+    
+    // 后台线程执行，把 消息队列flush进磁盘
     void process();
+
     // 生成时间信息string
     std::string strTime() ;
 
@@ -88,12 +90,12 @@ private:
     std::queue<std::string> msgQueue_;
     std::thread backendThread_;
     std::atomic<bool> stopLogging_;
-    // 存储每个log level 对应的string
-    // static const std::string levelStrs_[7]; 
+    std::atomic<bool> isfilelog_; // true: file log; false: stdout log
     std::string fileBaseName_;
+    std::string fileDir_;
     int fd_;
     LogLevel level_; /// FIXME: atomic
-    long lastRotate_;
+    time_t lastRotate_;
     long rotateInterval_;
 
 };

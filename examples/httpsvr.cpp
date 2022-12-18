@@ -13,7 +13,9 @@ int main(int argc, const char* argv[]) {
     else if(argc == 2) {
         port = atoi(argv[1]);
     }
-    set_logLevel(Logger::LogLevel::DISABLE);
+    // set_logLevel(Logger::LogLevel::DISABLE);
+    set_logName("httpsvr-log");
+    set_logInterval(60); // 60s
     EventLoops loop;
     SockAddr listenAddr(port);
     HttpServer webserver(&loop, listenAddr);

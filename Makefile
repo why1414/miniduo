@@ -46,7 +46,6 @@ uninstall:
 $(LIBRARY): $(MINIDUO_OBJECTS)
 		rm -f $@
 		$(AR) -rs $@ $(MINIDUO_OBJECTS)
-		rm -f */*.o
 
 .cpp.o:
 		$(CXX) $(CXXFLAGS) -c $< -o $@
