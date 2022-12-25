@@ -133,6 +133,12 @@ public:
     // Thread safe;
     void closeInNextLoop();
 
+    // Not Thread safe, called in loop
+    long sendfile(int filefd, long *offset, long count);
+    void enableWriting(bool enable) {
+        connChannel_->enableWriting(enable);
+    }
+
 private:
     enum class StateE { kConnecting, kConnected, kDisconnecting, kDisconnected, };
 
@@ -158,8 +164,8 @@ private:
     SockAddr localAddr_;
     SockAddr peerAddr_;
     ConnectionCallback connectionCallback_; // 用户回调
-    MsgCallback msgCallback_; // 用户回调
-    CloseCallback closeCallback_; // 绑定 TcpSever::removeConnection()
+    MsgCallback msgCallback_;               // 用户回调
+    CloseCallback closeCallback_;           // 绑定 TcpSever::removeConnection()
     WriteCompleteCallback writeCompleteCallback_; // 用户回调
 
 

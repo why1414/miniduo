@@ -74,6 +74,7 @@ EventLoop::EventLoop()
 EventLoop::~EventLoop(){
     assert(stoplooping_);
     closeEventfd(wakeupFd_);
+    log_trace("%p %d dtor()", this, util::currentTid());
 }
 
 
@@ -239,6 +240,7 @@ EventLoop* EventLoops::allocLoop() {
         return this;
     }
     EventLoop* loop = &subLoops_[next_];
+    assert(loop != nullptr);
     next_ = (next_ + 1) % size_;
     return loop;
 }

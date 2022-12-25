@@ -11,8 +11,9 @@ void func(int id) {
     // Logger::getLogger().logv(Logger::LogLevel(id), "%d", id);
     // log(Logger::LogLevel(5), "sfda", "%d", id);
     // log(Logger::LogLevel(5), "sfda", "sdfad");
-    
+    streamlog_trace << "streamlog worker thread " << id ;
     log_trace("worker thread %d", id);
+    // Logger::getLogger().streamLogv() << "[StreamLog]" << "[" <<__FILE__ << ":" << __LINE__  << "]" << "[" << __FUNCTION__ << "]: " << "worker thread " << id ;
     // log_debug("test test");
     // cout<<id<<endl;
     // exit_if(id == 1, "error, process exit");
@@ -22,7 +23,8 @@ void func(int id) {
 int main() {
     // Logger::getLogger().setLogLevel(Logger::LogLevel::ERROR);
     vector<thread> ts;
-    // set_logSwitchToStdout();
+    // set_logLevel(Logger::LogLevel::DISABLE);
+    // set_logSwitchToFileLog();
     for(int i=0; i<20; i++) {
         ts.push_back(thread(func, i));
     }

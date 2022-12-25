@@ -11,6 +11,11 @@
 
 using namespace miniduo;
 
+namespace miniduo {
+
+#define BUFFER_SIZE 4 * 1024
+#define BLOCK_SIZE 1024 * 1024
+}
 
 HttpServer::HttpServer(EventLoop *loop, const SockAddr &listenAddr) 
     : tcpServer_(loop, listenAddr)
@@ -72,10 +77,20 @@ void HttpServer::onWriteComplete(const TcpConnectionPtr &conn) {
     // http_log("more date to send");
     HttpRequest &req = getHttpRequest(conn);
     HttpResponse &resp = getHttpResponse(conn);
-    if(req.checkstate_ == CHECK_STATE::GET_ALL && resp.fileopen_ == true) {
-        char buf[2048];
+    if(resp.respComplete_ == true) {
+        bool close = resp.closeConnection_;
+        req.clear();
+        resp.clear();
+        if(close == true) {
+            conn->close();  
+        }
+        return ;
+    }
+    if(req.checkstate_ == CHECK_STATE::GET_ALL && resp.respComplete_ == false) {
+        // 利用用户空间 buffer 分块传输大文件，避免队头阻塞
+        char buf[BUFFER_SIZE];
         memset(buf, '\0', sizeof(buf));
-        int n = ::read(resp.fd_, buf, sizeof(buf));
+        int n = ::read(resp.filefd_, buf, sizeof(buf));
         if(n > 0) {
             conn->send(std::string(buf, n));
             http_log("%d data has been sent this time", n);
@@ -87,12 +102,32 @@ void HttpServer::onWriteComplete(const TcpConnectionPtr &conn) {
             req.clear();
             resp.clear();
             if(close == true) {
-                conn->closeInNextLoop();
+                conn->close();
             }
             // conn->closeInNextLoop();
             
             return ;
         }
+
+        // 零拷贝 sendfile 分块传输大文件，避免队头阻塞
+        // long ret = conn->sendfile(resp.filefd_, nullptr, BUFFER_SIZE);
+        // if(ret > 0) {
+        //     http_log("%ld bytes data have been sent", ret);
+        //     conn->enableWriting(true);
+        // }
+        // else { // ret == 0 || ret == -1
+        //     // conn->enableWriting(false);
+        //     http_log("File sending completed");
+        //     bool close = resp.closeConnection_;
+        //     req.clear();
+        //     resp.clear();
+        //     if(close == true) {
+        //         conn->close();
+        //     }
+        //     // conn->closeInNextLoop();
+            
+        //     return ;
+        // }
         
     } 
 }
@@ -111,8 +146,8 @@ HTTP_CODE HttpServer::handleRequest(const TcpConnectionPtr &conn) {
     http_log("HttpServer::handleRequest()");
     HttpRequest &req = getHttpRequest(conn);
     HttpResponse &resp = getHttpResponse(conn);
-    http_log("method: [%s]\n", req.method_.c_str());
-    http_log("URL: [%s]\n", req.URL_.c_str());
+    http_log("method: [%s]", req.method_.c_str());
+    http_log("URL: [%s]", req.URL_.c_str());
     http_log("version: [%s]", req.version_.c_str());
     
     std::string filePath =  resourcePath_ + req.URL_;
@@ -131,10 +166,6 @@ HTTP_CODE HttpServer::handleRequest(const TcpConnectionPtr &conn) {
     if(S_ISDIR(fileStat.st_mode)) {
         return HTTP_CODE::BAD_REQUEST;
     }
-
-    resp.filesize_ = fileStat.st_size;
-    resp.filepath_ = filePath;
-    http_log("file content length: %d", fileStat.st_size);
     return HTTP_CODE::FILE_REQUEST;
 }
 
@@ -146,34 +177,22 @@ void HttpServer::loadResponse(const TcpConnectionPtr &conn, HTTP_CODE retcode) {
     {
     case HTTP_CODE::INTERNAL_ERROR:
     {
-        int status = 500;
-        resp.addStatusLine(status);
-        resp.addHeaders(resp.responseStatus[status].second.size());
-        resp.addBody(resp.responseStatus[status].second);
+        loadFailResponse(resp, 500);
         break;
     }
     case HTTP_CODE::BAD_REQUEST:
     {
-        int status = 400;
-        resp.addStatusLine(status);
-        resp.addHeaders(resp.responseStatus[status].second.size());
-        resp.addBody(resp.responseStatus[status].second);
+        loadFailResponse(resp, 400);
         break;
     }
     case HTTP_CODE::FORBIDDEN_REQUEST:
     {   
-        int status = 403;
-        resp.addStatusLine(status);
-        resp.addHeaders(resp.responseStatus[status].second.size());
-        resp.addBody(resp.responseStatus[status].second);
+        loadFailResponse(resp, 403);
         break;
     }
     case HTTP_CODE::NO_RESOURCE:
     {
-        int status = 404;
-        resp.addStatusLine(status);
-        resp.addHeaders(resp.responseStatus[status].second.size());
-        resp.addBody(resp.responseStatus[status].second);
+        loadFailResponse(resp, 404);
         break;
     }
     case HTTP_CODE::FILE_REQUEST:
@@ -181,28 +200,31 @@ void HttpServer::loadResponse(const TcpConnectionPtr &conn, HTTP_CODE retcode) {
         // while(resp.fd_ < 0) {
         //     resp.fd_ = ::open(resp.filepath_.c_str(), O_RDONLY);
         // }
-        resp.fd_ = ::open(resp.filepath_.c_str(), O_RDONLY);
-        // printf("%d\n", resp.fd_);
-        assert(resp.fd_ > 0);
-        
+        std::string filepath = resourcePath_ + req.URL_;
+        resp.filefd_ = ::open(filepath.c_str(), O_RDONLY);
+        assert(resp.filefd_ > 0);
+        struct stat fileStat;
+        ::fstat(resp.filefd_, &fileStat);
         resp.addStatusLine(200);
-        resp.addHeaders(resp.filesize_);
+        resp.addHeaders(fileStat.st_size);
         http_log("open file");
-        char buf[2 * 1024]; // 2k bytes
-        int n = ::read(resp.fd_, buf, sizeof(buf));
+        char buf[BUFFER_SIZE]; // 4k bytes
+        int n = ::read(resp.filefd_, buf, sizeof(buf));
         http_log("read fd");
         if(n <= 0) {
+            http_log("Error read n is less than 0");
             assert(n != -1);
-            http_log("Error read n is less tha 0");
             break;
         }
-        resp.addBody(buf, n);
-        if( n < resp.filesize_) {
-            resp.fileopen_ = true;
-            http_log("filesize is larger than buffer");
+        else if(n < fileStat.st_size) {
+            http_log("filesize is larger than buffer size(4k bytes)");
+            resp.addBody(buf, n);
+            resp.respComplete_ = false;
         }
-        else { // n == resp.filesize_
-            http_log("filesize is less than buffer");
+        else {
+            http_log("filesize is less than buffer, all the data are loaded");
+            resp.addBody(buf, n);
+            resp.respComplete_ = true;  
         }
         
         break;
@@ -212,21 +234,20 @@ void HttpServer::loadResponse(const TcpConnectionPtr &conn, HTTP_CODE retcode) {
     }
 }
 
+void HttpServer::loadFailResponse(HttpResponse& resp, int status) {
+    resp.addStatusLine(status);
+    resp.addHeaders(resp.responseStatus[status].second.size());
+    resp.addBody(resp.responseStatus[status].second);
+    resp.respComplete_ = true;
+}
+
 void HttpServer::sendResponse(const TcpConnectionPtr &conn) {
     HttpResponse &resp = getHttpResponse(conn);
     HttpRequest &req = getHttpRequest(conn);
     http_log("HttpServer::sendReponse()");
     conn->send(resp.headers_);
     conn->send(resp.body_);
-    if(resp.fileopen_ == false) {
-        bool close = resp.closeConnection_;
-        req.clear();
-        resp.clear();
-        if(close == true) {
-            conn->closeInNextLoop();  
-        }
-        
-    }
+    // conn 在onWriteComplete() 中关闭 
     
 }
 

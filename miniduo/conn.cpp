@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <functional>
 #include <cassert>
+ #include <sys/sendfile.h> // sendfile()
 
 using namespace miniduo;
 // using namespace socket;
@@ -95,6 +96,7 @@ void TcpServer::newConnection(int sockfd, const SockAddr& peerAddr) {
             name_.c_str(), connName.c_str(), peerAddr.addrString().c_str());
     SockAddr localAddr(socket::getLocalAddr(sockfd));
     EventLoop* ioLoop = loop_->allocLoop();
+    assert(ioLoop != nullptr);
     TcpConnectionPtr conn( new TcpConnection(ioLoop, connName, sockfd, localAddr, peerAddr));
     connections_[connName] = conn;
     conn->setConnectionCallback(connectionCallback_);
@@ -136,6 +138,7 @@ TcpConnection::TcpConnection(EventLoop* loop,
       localAddr_(localAddr),
       peerAddr_(peerAddr)
 {
+    assert(loop_ != nullptr);
     log_debug("TcpConnection::ctor [%s] at %p fd=%d", name_.c_str(), this, sockfd);
     connChannel_->setReadCallback(
         std::bind(&TcpConnection::handleRead, this, std::placeholders::_1)
@@ -148,7 +151,7 @@ TcpConnection::TcpConnection(EventLoop* loop,
 }
 
 TcpConnection::~TcpConnection() {
-    log_debug("TcpConnection::dtor [%s] at %p fd=%d", name_.c_str(), this, sockFd_);
+    log_trace("TcpConnection::dtor [%s] at %p fd=%d", name_.c_str(), this, sockFd_);
     ::close(sockFd_);
 }
 
@@ -212,10 +215,13 @@ void TcpConnection::handleWrite() {
     loop_->assertInLoopThread();
     if(connChannel_->isWriting()) 
     {
-        ssize_t n = write(connChannel_->fd(),
+        ssize_t n = 0;
+        if(output_.readableBytes() > 0) {
+            n = write(connChannel_->fd(),
                           output_.beginRead(),
                           output_.readableBytes());
-        if(n > 0) 
+        }
+        if(n >= 0) 
         {
             output_.retrieve(n);
             if(output_.readableBytes() == 0) 
@@ -265,23 +271,30 @@ void TcpConnection::shutdownInLoop() {
 
 void TcpConnection::close() {
     // 立即关闭当前连接，已在任务队列中的未完成发射任务不会再执行
-    loop_->runInLoop(
-        [this] { loop_->queueInLoop(std::bind(&TcpConnection::closeInLoop, this));}
+    loop_->queueInLoop(
+        std::bind(&TcpConnection::closeInLoop, this)
     );
 }
 
 void TcpConnection::closeInNextLoop() {
     // 延后一个loop循环再关闭tcp连接，
-    // 当前循环(loop)中已在任务队列的发射任务会在下一次loop的IO处理中执行
+    // 当前循环(loop)中已在任务队列的发送任务会在下一次loop的IO处理中执行
     // 此处使用 两层queueInLoop 而不是 runInLoop，
     // 是为了确保当前loop中，已在任务队列中的发送任务能够先完成
     // closeInLoop() 会在下一次 loop 的任务队列中执行
+    log_trace("step into");
     loop_->queueInLoop(
         [this] { loop_->queueInLoop(std::bind(&TcpConnection::closeInLoop, this));}
     );
 }
 
 void TcpConnection::closeInLoop() {
+    log_trace("step into");
+    if(loop_ == nullptr) {
+        printf("thread: %d this: %p\n", util::currentTid(), this);
+
+    }
+    assert(loop_ != nullptr);
     loop_->assertInLoopThread();
     if(state_ == StateE::kConnected || state_ == StateE::kDisconnecting) {
         // setState(StateE::kDisconnected);
@@ -298,7 +311,7 @@ void TcpConnection::send(const std::string& msg) {
 }
 
 
-/// @brief 在loop中发送msg，将msg放入output buffer中，
+/// @brief 在loop{中发送msg，将msg放入output buffer中，
 /// 并激活监听 writable event
 /// @param msg 
 void TcpConnection::sendInLoop(const std::string& msg) {
@@ -309,5 +322,11 @@ void TcpConnection::sendInLoop(const std::string& msg) {
             connChannel_->enableWriting(true);
         }
     }
+}
+
+long TcpConnection::sendfile(int filefd, long *offset, long count) {
+    assert(filefd > 0);
+    loop_->assertInLoopThread();
+    return ::sendfile(connChannel_->fd(), filefd, offset, count);
 }
 

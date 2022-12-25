@@ -38,6 +38,7 @@ private:
     HTTP_CODE handleRequest(const TcpConnectionPtr &conn);
     void loadResponse(const TcpConnectionPtr &conn, HTTP_CODE retcode);
     void sendResponse(const TcpConnectionPtr &conn);
+    void loadFailResponse(HttpResponse& resp, int status);
 
     HttpRequest& getHttpRequest(const TcpConnectionPtr &conn) 
     { return conn->getContext<HttpContext>().req; }

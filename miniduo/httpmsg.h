@@ -118,13 +118,11 @@ struct HttpResponse {
         statusStr_.clear();
         headers_.clear();
         body_.clear();
-        closeConnection_ = false;
-        fileopen_ = false;
-        filepath_.clear();
-        filesize_  = 0;
-        if(fd_ != -1) {
-            ::close(fd_);
-            fd_ = -1;
+        closeConnection_ = true;
+        respComplete_ = false;
+        if(filefd_ != -1) {
+            ::close(filefd_);
+            filefd_ = -1;
         }
     }
 
@@ -148,11 +146,9 @@ struct HttpResponse {
     std::string body_;
 
     bool closeConnection_ = true;
+    bool respComplete_ = false;
 
-    bool fileopen_ = false;
-    std::string filepath_;
-    int filesize_;
-    int fd_ = -1;
+    int filefd_ = -1;
 
     static std::unordered_map<int, std::pair<std::string, std::string>> responseStatus;
 }; // class HttpResponse

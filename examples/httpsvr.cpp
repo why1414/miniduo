@@ -15,8 +15,9 @@ int main(int argc, const char* argv[]) {
     }
     // set_logLevel(Logger::LogLevel::DISABLE);
     set_logName("httpsvr-log");
-    set_logInterval(60); // 60s
-    EventLoops loop;
+    // set_logInterval(3*60); // 60s
+    set_logSwitchToFileLog();
+    EventLoops loop(16);
     SockAddr listenAddr(port);
     HttpServer webserver(&loop, listenAddr);
     webserver.setResourcePath(resPath);
