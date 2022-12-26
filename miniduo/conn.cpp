@@ -303,7 +303,8 @@ void TcpConnection::closeInLoop() {
 }
 
 void TcpConnection::send(const std::string& msg) {
-    assert(msg.size() > 0);
+    // if msg is empty, this call will only enable writeable event
+    assert(msg.size() >= 0); 
     loop_->runInLoop(
         std::bind(&TcpConnection::sendInLoop, this, msg)
     );

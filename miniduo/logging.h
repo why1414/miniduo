@@ -119,9 +119,8 @@ private:
 private:
     std::mutex mut_;
     std::condition_variable cv_;
-    std::list<std::string> msgQueue_; // replaced by msg_
+    // std::list<std::string> msgQueue_; // replaced by msg_
     std::string msg_;
-    // std::queue<std::string> msgOutputQueue_;
 
     std::thread backendThread_;
     std::atomic<bool> stopLogging_;

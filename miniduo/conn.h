@@ -135,9 +135,6 @@ public:
 
     // Not Thread safe, called in loop
     long sendfile(int filefd, long *offset, long count);
-    void enableWriting(bool enable) {
-        connChannel_->enableWriting(enable);
-    }
 
 private:
     enum class StateE { kConnecting, kConnected, kDisconnecting, kDisconnected, };

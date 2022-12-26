@@ -31,8 +31,6 @@ int main() {
     for(auto& t: ts)
         t.join();
 
-    
-    // std::cout<<__FILE__<<__LINE__<<std::endl;
     return 0;
 
 }
