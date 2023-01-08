@@ -78,6 +78,7 @@ void HttpServer::onWriteComplete(const TcpConnectionPtr &conn) {
     HttpRequest &req = getHttpRequest(conn);
     HttpResponse &resp = getHttpResponse(conn);
     if(resp.respComplete_ == true) {
+        http_log("Response send completed");
         bool close = resp.closeConnection_;
         req.clear();
         resp.clear();

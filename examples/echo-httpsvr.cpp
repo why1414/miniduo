@@ -1,4 +1,4 @@
-#include <miniduo/miniduo.h>
+#include "miniduo/miniduo.h"
 
 using namespace miniduo;
 
@@ -25,7 +25,7 @@ int main(int argc, const char *argv[]) {
     server.setMsgCallback(onMsg);
     server.start();
     HttpServer httpserver(&loop, httplisten);
-    std::string resPath = "/mnt/e/GitHub/miniduo_/resource";
+    std::string resPath = "/mnt/e/GitHub/miniduo_/examples/resource";
     httpserver.setResourcePath(resPath);
     httpserver.start();
     loop.loop();

@@ -15,10 +15,11 @@
 
 
 #define FLUSH_SIZE 4 * 1024
-
+#define FLUSH_INTERVAL 3 
+#define FILE_SIZE 100 * 1024 * 1024 
 
 Logger::Logger()
-    : level_(LogLevel::TRACE),
+    : level_(LogLevel::DISABLE),
       fileDir_("log/"),
       fileBaseName_("log"),
       rotateInterval_(24 * 60 * 60),
@@ -26,12 +27,12 @@ Logger::Logger()
       fd_(1),
       stopLogging_(false),
       isfilelog_(false),
-      backendThread_(std::thread(&Logger::process, this))
+      backendThread_(std::thread(&Logger::flush, this))
 
 {   
-    ::mkdir(fileDir_.c_str(), 0);
+
     // msgQueue_.push_back("[Logger created] \n");
-    msg_.append("[Logger created] \n");
+    // msg_.append("[Logger created] \n");
 }
 
 Logger::~Logger() {
@@ -39,7 +40,7 @@ Logger::~Logger() {
         std::unique_lock<std::mutex> lock(mut_);
         stopLogging_ = true;
         // msgQueue_.push_back("[Logger destroyed] \n");
-        msg_.append("[Logger destroyed] \n");
+        // msg_.append("[Logger destroyed] \n");
 
         cv_.notify_one();        
     }
@@ -49,45 +50,20 @@ Logger::~Logger() {
     
 }
 
-void Logger::process() {
+void Logger::flush() {
     while(!stopLogging_) {
         // 检查fd_
         if(isfilelog_) {
             tryRotate();
         }
 
-        // std::list<std::string> msgOutputQueue_;
-
-        // std::unique_lock<std::mutex> lock(mut_);
-        // while(msgQueue_.empty() && !stopLogging_) {
-        //     cv_.wait(lock);
-        // }
-        // msgOutputQueue_.swap(msgQueue_);
-        // lock.unlock();
-
-        // char buf[4 * 1024];
-
-        // while(!msgOutputQueue_.empty()) {
-        //     int len = 0;
-        //     while (!msgOutputQueue_.empty() && (sizeof(buf) - len) > msgOutputQueue_.front().size()) {
-        //         std::string msg(std::move(msgOutputQueue_.front()));
-        //         msgOutputQueue_.pop_front();
-        //         std::copy(msg.begin(), msg.end(), buf+len);
-        //         len += msg.size();
-        //     }
-        //     // std::string msg = msgOutputQueue_.front();
-        //     // msgOutputQueue_.pop_front();
-        //     // 写入文件
-        //     // int err = ::write(fd_, msg.c_str(), msg.length());
-        //     int err = ::write(fd_, buf, len);
-        // }
-
-
         std::string msg;
         std::unique_lock<std::mutex> lock(mut_);
         while(msg_.empty() && !stopLogging_) {
-            cv_.wait(lock);
+            // cv_.wait(lock);
+            cv_.wait_for(lock, std::chrono::seconds(FLUSH_INTERVAL));
         }
+        // printf("msg_.capacity: %ld, before flush\n", msg_.capacity());
         msg.swap(msg_);
         lock.unlock();
         const char *buf = msg.data();
@@ -100,9 +76,7 @@ void Logger::process() {
             }
             // printf("tosend %d\n", tosend);
         }
-        // printf("kkkk\n");
-
-             
+        // printf("msg_.capacity: %ld, after flush\n", msg_.capacity());
 
     }
 
@@ -110,6 +84,7 @@ void Logger::process() {
 
 void Logger::switchToFileLog() {
     assert(fd_ == 1);
+    ::mkdir(fileDir_.c_str(), 0);
     int newfd = openNewLogfile();
     setfd(newfd);
     // isfilelog_ = true;
@@ -122,9 +97,9 @@ int Logger::openNewLogfile() {
     ::localtime_r(&lastRotate_, &ntm);
     char newname[4096];
     ::snprintf( newname, sizeof(newname), 
-                "%s%s.%d%02d%02d%02d%02d", 
+                "%s%s.%d%02d%02d-%02d%02d%02d", 
                 fileDir_.c_str(), fileBaseName_.c_str(), 
-                ntm.tm_year + 1900, ntm.tm_mon + 1, ntm.tm_mday, ntm.tm_hour, ntm.tm_min);
+                ntm.tm_year + 1900, ntm.tm_mon + 1, ntm.tm_mday, ntm.tm_hour, ntm.tm_min, ntm.tm_sec); 
     int fd = ::open(newname, O_APPEND | O_CREAT | O_WRONLY | O_CLOEXEC, DEFFILEMODE);
     if(fd < 0) {
         fprintf(stderr, "open log file %s failed. msg: %s ignored\n", newname, ::strerror(errno));
@@ -151,7 +126,7 @@ void Logger::logv(const LogLevel level,
     int n = vsnprintf(buffer, sizeof(buffer), fmt, args);
     va_end(args);
 
-    flush(std::string(buffer, n));
+    append(std::string(buffer, n));
     
 }
 
@@ -159,7 +134,10 @@ void Logger::logv(const LogLevel level,
 void Logger::tryRotate() {
     if(!isfilelog_) return ;
     time_t now = ::time(nullptr);
-    if((now - lastRotate_) < rotateInterval_ ) {
+    long interval = now - lastRotate_;
+    struct stat filestat;
+    ::fstat(fd_, &filestat);
+    if(interval < rotateInterval_ && filestat.st_size < FILE_SIZE) {
         return ;
     }
     lastRotate_ = now;
@@ -200,7 +178,7 @@ std::string Logger::tid() {
     return std::to_string(currTid);
 }
 
-void Logger::flush(const std::string &msg) {
+void Logger::append(const std::string &msg) {
     std::string &&logmsg = "[" + timeNow() + "]" +
                            "[" + tid()     + "]" +
                            msg +
@@ -222,7 +200,7 @@ void Logger::setLogLevel(LogLevel level) {
 }
 
 void Logger::setFileBaseName(std::string basename) {
-    fileBaseName_ = basename;
+    fileBaseName_ = basename ;
 }
 
 void Logger::setRotateInterval(long interval) {

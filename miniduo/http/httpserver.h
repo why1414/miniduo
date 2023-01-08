@@ -47,7 +47,7 @@ private:
 
     TcpServer tcpServer_;
 
-    std::string resourcePath_ = "./resource";
+    std::string resourcePath_ ;
 
 }; // class HttpServer
 

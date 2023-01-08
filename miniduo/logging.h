@@ -96,8 +96,8 @@ private:
     // 新建一个logfile，根据lastRotate_时间
     int openNewLogfile();
     
-    // 后台线程执行，把 消息队列flush进磁盘
-    void process();
+    // 后台线程执行，把 消息队列flush进磁盘 lock && flush
+    void flush();
 
     // 生成时间信息string
     std::string timeNow() ;
@@ -105,8 +105,8 @@ private:
     // 生成线程id 
     std::string tid();
 
-    // lock && flush
-    void flush(const std::string &msg);
+    // lock && append
+    void append(const std::string &msg);
 
     void setfd(const int fd) {
         fd_ = fd;
@@ -130,7 +130,7 @@ private:
     int fd_;
     LogLevel level_; /// FIXME: atomic
     time_t lastRotate_;
-    long rotateInterval_;
+    long rotateInterval_; // seconds
 
 };
 
@@ -141,7 +141,7 @@ public:
     LogStream(const LogStream &ls): logger_(ls.logger_), level_(ls.level_) {}
     ~LogStream() {
         if(level_ >= logger_.getLogLevel()) {
-            logger_.flush(str());
+            logger_.append(str());
         }
     }
 private:

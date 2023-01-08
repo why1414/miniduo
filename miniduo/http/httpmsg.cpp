@@ -40,7 +40,7 @@ using namespace miniduo;
 
 
 LINE_STATUS HttpRequest::parseLine(Buffer *buf) {
-    http_log("step in this call");
+    // http_log("step in this call");
     if(buf->findCRLF() != nullptr ) {
         return LINE_STATUS::LINE_OK;
     }
@@ -101,7 +101,7 @@ HTTP_CODE HttpRequest::parseRequstline(Buffer *buf) {
 }
 
 HTTP_CODE HttpRequest::parseHeaders(Buffer *buf) {
-    http_log("step in this call");
+    // http_log("step in this call");
     std::string line = retrieveLine(buf);
     http_log("HttpRequest::parseHeaders(): %s", line.c_str());
     std::size_t idx = 0;
@@ -142,11 +142,11 @@ HTTP_CODE HttpRequest::parseContent(Buffer *buf) {
 
 std::string HttpRequest::retrieveLine(Buffer *buf) {
     const char* crlf = buf->findCRLF();
-    http_log("begin:%p, crlf:%p",buf->beginRead(), crlf);
+    // http_log("begin:%p, crlf:%p",buf->beginRead(), crlf);
     assert(crlf != nullptr);
-    http_log("%d", crlf-buf->beginRead());
+    // http_log("%d", crlf-buf->beginRead());
     std::string line(buf->beginRead(), crlf-buf->beginRead());
-    http_log("%d", crlf-buf->beginRead());
+    // http_log("%d", crlf-buf->beginRead());
     buf->retrieveUntil(crlf+2);
     return line;
 }
